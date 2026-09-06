@@ -1,4 +1,4 @@
-------------UPDATE DIN CHAT 5 - 06.09.2026---------------
+------------UPDATE - 06.09.2026---------------
 Project LUDUS
 Super Mario Strikers native PC port
 
