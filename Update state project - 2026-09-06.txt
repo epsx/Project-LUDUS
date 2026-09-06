@@ -1,0 +1,185 @@
+------------UPDATE DIN CHAT 5 - 06.09.2026---------------
+Project LUDUS
+Super Mario Strikers native PC port
+
+Campaigns / milestones:
+  Pax Matrixa      → matrix subsystem
+  Aquila Surgit    → renderer + retail startup bring-up
+  Rubicon LXIV     → BMD / 32-bit → x64 conversion
+  Prima Lux        → first real rendered game frame
+  Roma Victrix     → first playable in-game scene / match
+  Triumphus        → major native-PC milestone
+
+
+Project LUDUS — Current Campaign: Aquila Surgit
+
+
+Project LUDUS — rough progress
+
+Infrastructure / platform foundation   ███████████████████░  ~94%
+Pax Matrixa                            ████████████████████  100%
+Aquila Surgit                          █████████████████░░░  ~85%
+Rubicon LXIV                           █████████░░░░░░░░░░░  ~45%
+Prima Lux                              ████████████░░░░░░░░  ~60% toward it
+Roma Victrix                           ████░░░░░░░░░░░░░░░░  ~20–25%
+Triumphus / final polished port        █████░░░░░░░░░░░░░░░  ~25–30%
+
+
+Renderer / platform startup
+  [DONE] Aurora native window / WebGPU / D3D12
+  [DONE] PC memory runtime
+  [DONE] PC filesystem runtime
+  [DONE] matrix subsystem / Pax Matrixa
+  [DONE] GL / GLX startup foundation
+  [DONE] GL target startup
+  [DONE] GL view startup
+  [DONE] GL font startup
+  [DONE] GL constant startup
+  [DONE] global.glt loading
+  [DONE] 46/46 global textures decoded and registered
+  [DONE] PC startup smoke path stable from retail working directory
+  [DONE] clean Alt+F4 shutdown / exit=0
+  [TODO] actual GC texture payload upload/conversion to WebGPU
+
+
+Retail startup sequence
+  [DONE] Config runtime x64 compatibility
+  [DONE] common.ini loading
+  [DONE] platform.ini / locale.ini / user.ini handling
+  [DONE] EventManager runtime
+  [DONE] EventManager::Create(128, 64)
+  [DONE] nlTaskManager runtime
+  [DONE] nlTaskManager::Startup(0x10000)
+  [DONE] retail SimpleParser PC compatibility
+  [DONE] retail tDebugPrintManager runtime
+  [DONE] PrintCfg.txt parsing validation
+  [DONE] tDebugPrintManager::Initialize() integrated
+  [NEXT] ClockManager::Initialize()
+
+
+MusyX / audio x64 bring-up
+  [DONE] MusyX source imported into the native PC build
+  [DONE] MusyX static library builds under MSVC x64
+  [DONE] PC audio runtime links into smstrikers_pc
+  [DONE] 02C40A — MSVC-safe pack scopes in seq.h / synth.h
+  [DONE] 02C40B — MSVC-safe inline_depth scope in stream.c
+  [DONE] 02C40C — GCC diagnostic pragmas guarded from MSVC
+  [DONE] C4103 packing/alignment warning frontier removed from these headers
+  [DONE] C4068 pragma warning frontier removed from MusyX targeted build
+  [DONE] GameCube / MWCC behavior preserved after all three fixes
+  [CURRENT] C4028 signature mismatch in hw_aramdma.c
+  [NEXT] 10x C4311 pointer truncation sites across hardware/DSP/sample code
+
+  Current targeted MusyX warning frontier:
+    10x C4311 pointer truncation
+     1x C4028 formal parameter mismatch
+
+  Important:
+    MusyX is now very substantially imported and build-integrated on PC,
+    but "full imported" does not yet mean "fully functional native audio".
+    ARAM / DSP / address-width assumptions still contain Dolphin-era
+    32-bit semantics that must be adapted carefully for x64.
+
+
+Recent validation anchors
+  [PASS] targeted MusyX MSVC x64 build
+  [PASS] full Release PC build
+  [PASS] smstrikers_pc.exe produced successfully
+  [PASS] runtime from orig\G4QE01\files
+  [PASS] stable blue framebuffer
+  [PASS] Alt+F4 clean shutdown
+  [PASS] exit=0
+  [PASS] nested MusyX diff --check
+  [PASS] GameCube reference rebuild after MusyX changes
+  [PASS] build/G4QE01/main.dol: OK
+
+
+Recent commits — Aquila Surgit / MusyX cleanup
+  Outer repo:
+    55269717  Update MusyX MSVC pack scopes
+    669c7b27  Update MusyX MSVC inline-depth scope
+    b5572b8e  Update MusyX MSVC GCC diagnostic guards
+
+  extern/musyx:
+    d3e7734  Fix MSVC pack scopes in MusyX headers
+    1e295a5  Fix MSVC inline-depth scope in MusyX stream
+    e37a40a  Guard GCC diagnostics from MSVC
+
+
+Deferred dependency frontiers
+  [AUDITED] FrontEnd::FEEventHandler
+  [AUDITED] OverlayManager::FEEventHandler
+  [AUDITED] FEAudioEventHandler
+  [AUDITED] Audio::AudioEventHandler
+
+  These are intentionally deferred until their real FE/audio
+  dependencies are available — no fake stubs / no skipped logic.
+
+
+PC executable:
+  build-pc\Release\smstrikers_pc.exe
+
+Required retail runtime working directory:
+  orig\G4QE01\files
+
+
+Current visual state:
+  clean blue framebuffer
+  no crash
+  clean Alt+F4 shutdown
+  exit=0
+
+
+Current startup reached:
+  Aurora / WebGPU
+      ↓
+  GL / GLX startup
+      ↓
+  global.glt
+      ↓
+  retail config files
+      ↓
+  EventManager
+      ↓
+  nlTaskManager
+      ↓
+  tDebugPrintManager
+      ↓
+  [NEXT] ClockManager
+
+
+GameCube reference remains intact:
+
+  731 / 731 files
+  8605 / 8605 functions
+  Code: 2662332 / 2662332 bytes
+  Data: 960203 / 961907 bytes — 99.82%
+
+  250 / 250 Fans
+   90 /  90 Megastrikes
+
+
+High-level interpretation — 06.09.2026
+
+  The project is beyond the platform-proof stage.
+
+  The PC executable has a stable native window/render startup path,
+  retail filesystem/config startup is running, global texture metadata
+  is loaded, core runtime managers are being brought up in original
+  order, and MusyX now builds deeply enough on MSVC x64 that the
+  remaining warnings expose real 32-bit/Dolphin assumptions rather
+  than basic import/build failures.
+
+  The largest remaining gap before Prima Lux is still rendering:
+  converting/uploading the real GameCube texture/render payloads into
+  the native WebGPU path and continuing the retail startup chain far
+  enough to produce the first genuine rendered game frame.
+
+  Rough overall native-port completion:
+    ~25–30% toward a polished Triumphus-quality port.
+
+  Rough position toward the first real rendered game frame (Prima Lux):
+    ~60%.
+
+  Aquila Surgit itself:
+    ~85% complete.
