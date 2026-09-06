@@ -1,0 +1,309 @@
+------------UPDATE DIN CHAT 6 - 07.09.2026---------------
+Project LUDUS
+Super Mario Strikers native PC port
+
+Campaigns / milestones:
+  Pax Matrixa      → matrix subsystem
+  Aquila Surgit    → renderer + retail startup bring-up
+  Rubicon LXIV     → BMD / 32-bit → x64 conversion
+  Prima Lux        → first real rendered game frame
+  Roma Victrix     → first playable in-game scene / match
+  Triumphus        → major native-PC milestone
+
+
+Project LUDUS — Current Campaign: Aquila Surgit
+
+
+Project LUDUS — rough progress
+
+Infrastructure / platform foundation   ███████████████████░  ~95%
+Pax Matrixa                            ████████████████████  100%
+Aquila Surgit                          █████████████████░░░  ~87%
+Rubicon LXIV                           █████████░░░░░░░░░░░  ~45%
+Prima Lux                              ████████████░░░░░░░░  ~62% toward it
+Roma Victrix                           ████░░░░░░░░░░░░░░░░  ~20–25%
+Triumphus / final polished port        █████░░░░░░░░░░░░░░░  ~25–30%
+
+
+Renderer / platform startup
+  [DONE] Aurora native window / WebGPU / D3D12
+  [DONE] PC memory runtime
+  [DONE] PC filesystem runtime
+  [DONE] matrix subsystem / Pax Matrixa
+  [DONE] GL / GLX startup foundation
+  [DONE] GL target startup
+  [DONE] GL view startup
+  [DONE] GL font startup
+  [DONE] GL constant startup
+  [DONE] global.glt loading
+  [DONE] 46/46 global textures decoded and registered
+  [DONE] PC startup smoke path stable from retail working directory
+  [DONE] clean Alt+F4 shutdown / exit=0
+  [DONE] PC target FPS query available (60 Hz)
+  [TODO] actual GC texture payload upload/conversion to WebGPU
+
+
+Retail startup sequence
+  [DONE] Config runtime x64 compatibility
+  [DONE] common.ini loading
+  [DONE] platform.ini / locale.ini / user.ini handling
+  [DONE] EventManager runtime
+  [DONE] EventManager::Create(128, 64)
+  [DONE] nlTaskManager runtime
+  [DONE] nlTaskManager::Startup(0x10000)
+  [DONE] retail SimpleParser PC compatibility
+  [DONE] retail tDebugPrintManager runtime
+  [DONE] PrintCfg.txt parsing validation
+  [DONE] tDebugPrintManager::Initialize() integrated
+  [DONE] ClockManager startup frontier passed
+  [DONE] FE audio lookup startup validation integrated
+  [DONE] FEStreamConfig startup validation integrated
+  [DONE] platform audio startup validation integrated
+  [DONE] glResourceMark()
+  [DONE] glInventory.Create()
+  [DONE] InitPads() integrated immediately after glInventory.Create()
+  [NEXT] runtime smoke test of smstrikers_pc.exe with InitPads() active
+  [LATER] AIPadManager::Startup()
+  [LATER] FEInput::Initialize()
+  [LATER] FlickDetection::Initialize()
+
+
+PC input / pad bring-up
+  [DONE] Aurora PAD backend linked into smstrikers_pc
+  [DONE] PC PADStatus layout matched to Aurora ABI
+         TARGET_PC PADStatus includes extButton
+  [DONE] platpad.cpp portability for MSVC/x64
+         PPC-only deadzone asm replaced by PC C++ path
+         __cntlzw replaced by std::countl_zero on TARGET_PC
+  [DONE] globalpad.cpp + platpad.cpp compiled in smstrikers_pcinput_runtime
+  [DONE] PadActions.cpp + PadMonkey.cpp compiled in smstrikers_pcinput_runtime
+  [DONE] PC-safe cPlatPad allocation uses sizeof(cPlatPad)
+  [DONE] PC-safe PadMonkey allocation uses sizeof(PadMonkey)
+  [DONE] retail GameCube allocation literals preserved under non-PC builds
+  [DONE] glx_GetTargetFPS() PC implementation returns 60
+  [DONE] InitPads() linked into the real PC startup bridge
+  [DONE] glplat prestartup test include-path regression fixed
+
+  x64 layout audit:
+    sizeof(cGlobalPad) = 32
+    sizeof(cPlatPad)   = 32
+    sizeof(PadMonkey)  = 232
+
+  Important:
+    Retail hard-coded allocation sizes were 0x1C for cPlatPad and
+    0xD8 for PadMonkey. Those are too small for the MSVC x64 layouts,
+    so TARGET_PC now allocates with sizeof(...) while GameCube keeps
+    the original retail constants.
+
+  Deferred intentionally:
+    SISetSamplingRate(0)
+    PADSetSamplingCallback(VBlankPadUpdate)
+
+    Aurora does not expose those retail APIs directly. The PC polling
+    model will be decided only after the native frame loop is inspected.
+    VBlankPadUpdate() must not be wired blindly.
+
+  Controller validation:
+    Real end-to-end polling/input validation is still pending.
+    A PS4 controller will be connected when that stage is reached.
+
+
+MusyX / audio x64 bring-up
+  [DONE] MusyX source imported into the native PC build
+  [DONE] MusyX static library builds under MSVC x64
+  [DONE] PC audio runtime links into smstrikers_pc
+  [DONE] 02C40A — MSVC-safe pack scopes in seq.h / synth.h
+  [DONE] 02C40B — MSVC-safe inline_depth scope in stream.c
+  [DONE] 02C40C — GCC diagnostic pragmas guarded from MSVC
+  [DONE] C4103 packing/alignment warning frontier removed from these headers
+  [DONE] C4068 pragma warning frontier removed from MusyX targeted build
+  [DONE] GameCube / MWCC behavior preserved after all three fixes
+  [DONE] FE audio lookup is validated during PC startup
+  [DONE] FEStreamConfig is validated during PC startup
+  [DONE] platform audio startup bridge is validated during PC startup
+
+  Last audited targeted MusyX warning frontier:
+    10x C4311 pointer truncation
+     1x C4028 formal parameter mismatch
+
+  Important:
+    MusyX is very substantially imported and build-integrated on PC,
+    but "full imported" does not yet mean "fully functional native audio".
+    ARAM / DSP / address-width assumptions still contain Dolphin-era
+    32-bit semantics that must be adapted carefully for x64.
+
+
+Recent validation anchors
+  [PASS] full Release PC build after InitPads() integration
+  [PASS] smstrikers_pcinput_runtime build
+  [PASS] smstrikers_pc.exe link
+  [PASS] smstrikers_glplat_prestartup_test.exe
+         output:
+           glplatPreStartup : true
+           PASS
+  [PASS] previous runtime smoke from orig\G4QE01\files
+  [PASS] stable blue framebuffer at last runtime checkpoint
+  [PASS] Alt+F4 clean shutdown at last runtime checkpoint
+  [PASS] exit=0 at last runtime checkpoint
+  [PASS] GameCube reference baseline after input changes
+  [PASS] 731 / 731 files linked
+  [PASS] 250 / 250 Fans
+  [PASS] 90 / 90 Megastrikes
+
+  Important:
+    The executable has NOT yet been runtime-smoked after the final
+    InitPads() startup integration. Compile/link and GameCube baseline
+    are green; the next action is the post-InitPads runtime launch.
+
+
+Recent commits — Aquila Surgit / PC input bring-up
+  8122cc3a  Fix pad monkey layout ownership
+  e880f35c  Match PC PADStatus Aurora ABI
+  f1c428e6  Link Aurora PAD backend
+  0f68cbbe  Add PC platpad portability
+  bc0d5f72  Add PC target FPS query
+  5068be44  Add PC input runtime
+  09b9a85e  Use PC-safe pad allocation sizes
+  42e1f42b  Extend PC input runtime
+  764eadd7  Initialize PC pads during startup
+  ebbe096d  Fix glplat prestartup test include paths
+
+
+Earlier renderer / startup commits still relevant
+  2e871c77  Add PC glxTarget startup boundary
+  d027d9a3  Integrate PC global texture startup
+  ed655062  Validate PC FE audio lookup during startup
+
+
+Deferred dependency / architecture frontiers
+  [AUDITED] FrontEnd::FEEventHandler
+  [AUDITED] OverlayManager::FEEventHandler
+  [AUDITED] FEAudioEventHandler
+  [AUDITED] Audio::AudioEventHandler
+
+  These remain intentionally deferred until their real FE/audio
+  dependencies are available — no fake stubs / no skipped logic.
+
+  [DEFERRED] Retail PAD sampling callback model
+  Reason:
+    Aurora PAD provides PADRead / PADClampCircle / PADControlMotor /
+    PADReset, but not the exact retail SISetSamplingRate /
+    PADSetSamplingCallback model. The native frame-loop integration
+    must be inspected first.
+
+
+PC executable:
+  build-pc\Release\smstrikers_pc.exe
+
+Required retail runtime working directory:
+  orig\G4QE01\files
+
+
+Current visual state:
+  Last validated runtime checkpoint:
+    clean blue framebuffer
+    no crash
+    clean Alt+F4 shutdown
+    exit=0
+
+  New startup state after that checkpoint:
+    InitPads() is now compiled and linked into the startup bridge.
+
+  [NEXT]
+    Launch the executable from orig\G4QE01\files and verify that the
+    new InitPads() startup step does not regress the stable runtime.
+
+
+Current startup reached:
+  Aurora / WebGPU
+      ↓
+  GL / GLX startup
+      ↓
+  global.glt + global texture registration
+      ↓
+  retail config files
+      ↓
+  EventManager
+      ↓
+  nlTaskManager
+      ↓
+  tDebugPrintManager
+      ↓
+  ClockManager / later startup managers
+      ↓
+  PC audio / FE audio startup validation
+      ↓
+  glResourceMark()
+      ↓
+  glInventory.Create()
+      ↓
+  InitPads()
+      ↓
+  [NEXT] post-InitPads runtime smoke
+      ↓
+  [LATER] AIPadManager / FEInput / FlickDetection
+
+
+GameCube reference remains intact:
+
+  731 / 731 files
+  8605 / 8605 functions
+  Code: 2662332 / 2662332 bytes
+  Data: 960203 / 961907 bytes — 99.82%
+
+  250 / 250 Fans
+   90 /  90 Megastrikes
+
+
+Repository checkpoint
+  Branch:
+    pc-port
+
+  Code changes:
+    committed
+
+  Known intentionally untouched Progress document state:
+     D "Super Mario Strikers PC Port – Progress.md"
+    ?? "Super Mario Strikers PC Port - Progress.md"
+
+  Do NOT stage these two entries as part of PC-port code commits.
+
+
+High-level interpretation — 07.09.2026
+
+  Project LUDUS remains beyond the platform-proof stage.
+
+  The native PC executable has a stable Aurora/WebGPU foundation,
+  retail filesystem/config startup, global texture metadata loading,
+  core managers, audio-startup validation, and now a real PC input
+  runtime built from the retail globalpad / platpad / PadActions /
+  PadMonkey code path.
+
+  A major x64 input correctness issue has been closed: retail pad
+  allocation constants are preserved for GameCube, while TARGET_PC
+  allocates the larger MSVC x64 object layouts safely.
+
+  InitPads() is now in the real PC startup sequence immediately after
+  glInventory.Create(). Compile/link validation is green and the
+  GameCube reference remains byte-valid at the established baseline.
+
+  The immediate next checkpoint is deliberately small:
+    runtime-smoke the executable with InitPads() active.
+
+  After that, the next input frontier is not to emulate the GameCube
+  sampling callback blindly, but to inspect the native frame loop and
+  decide where Aurora PAD polling / VBlankPadUpdate() belongs.
+
+  The largest remaining gap before Prima Lux is still rendering:
+  converting/uploading the real GameCube texture/render payloads into
+  the native WebGPU path and continuing the retail startup chain far
+  enough to produce the first genuine rendered game frame.
+
+  Rough overall native-port completion:
+    ~25–30% toward a polished Triumphus-quality port.
+
+  Rough position toward the first real rendered game frame (Prima Lux):
+    ~62%.
+
+  Aquila Surgit itself:
+    ~87% complete.
