@@ -1,0 +1,619 @@
+------------UPDATE DIN CHAT - 11.09.2026---------------
+Project LUDUS
+Super Mario Strikers native PC port
+
+Campaigns / milestones:
+  Pax Matrixa      → matrix subsystem
+  Aquila Surgit    → renderer + retail startup bring-up
+  Rubicon LXIV     → BMD / 32-bit → x64 conversion
+  Prima Lux        → first real rendered game frame
+  Roma Victrix     → first playable in-game scene / match
+  Triumphus        → major native-PC milestone
+
+
+Project LUDUS — Current Campaign: Aquila Surgit
+
+
+Project LUDUS — rough progress
+
+Infrastructure / platform foundation   ███████████████████░  ~95%
+Pax Matrixa                            ████████████████████  100%
+Aquila Surgit                          ██████████████████░░  ~91%
+Rubicon LXIV                           █████████░░░░░░░░░░░  ~45%
+Prima Lux                              █████████████░░░░░░░  ~65% toward it
+Roma Victrix                           ████░░░░░░░░░░░░░░░░  ~20–25%
+Triumphus / final polished port        █████░░░░░░░░░░░░░░░  ~25–30%
+
+
+Renderer / platform startup
+  [DONE] Aurora native window / WebGPU / D3D12
+  [DONE] PC memory runtime
+  [DONE] PC filesystem runtime
+  [DONE] matrix subsystem / Pax Matrixa
+  [DONE] GL / GLX startup foundation
+  [DONE] GL target startup
+  [DONE] GL view startup
+  [DONE] GL font startup
+  [DONE] GL constant startup
+  [DONE] global.glt loading
+  [DONE] 46/46 global textures decoded and registered
+  [DONE] PC startup smoke path stable from retail working directory
+  [DONE] clean Alt+F4 shutdown / exit=0
+  [DONE] PC target FPS query available (60 Hz)
+  [KNOWN] PC file opens are currently relative to process working directory
+          PCFile::Open() uses std::fopen(filename, "rb") directly
+          and nlInitFileSystem() does not establish an asset root
+  [KNOWN] therefore smstrikers_pc.exe must currently be launched from:
+          orig\G4QE01\files
+  [TODO] eventual PC asset-root / packaging policy independent of CWD
+  [TODO] actual GC texture payload upload/conversion to WebGPU
+
+
+Retail startup sequence
+  [DONE] Config runtime x64 compatibility
+  [DONE] common.ini loading
+  [DONE] platform.ini / locale.ini / user.ini handling
+  [DONE] EventManager runtime
+  [DONE] EventManager::Create(128, 64)
+  [DONE] nlTaskManager runtime
+  [DONE] nlTaskManager::Startup(0x10000)
+  [DONE] nlTaskManager task dispatch runtime validated
+  [DONE] nlTaskManager state-transition callback/commit semantics validated
+  [DONE] retail initial pending state restored on PC:
+         skipfe ? 2 : 4
+  [DONE] retail SimpleParser PC compatibility
+  [DONE] retail tDebugPrintManager runtime
+  [DONE] PrintCfg.txt parsing validation
+  [DONE] tDebugPrintManager::Initialize() integrated
+  [DONE] ClockManager::Initialize() integrated
+  [DONE] FE audio lookup startup validation integrated
+  [DONE] FEStreamConfig startup validation integrated
+  [DONE] platform audio startup validation integrated
+  [DONE] glResourceMark()
+  [DONE] glInventory.Create()
+  [DONE] InitPads()
+  [DONE] AIPadManager::Startup()
+  [DONE] FEInput::Initialize()
+  [DONE] FlickDetection::Initialize()
+  [DONE] PC input update task registered with nlTaskManager
+  [DONE] first real PC nlTaskManager::RunAllTasks() path active in frame loop
+  [DONE] ClockUpdateTask integrated + tested at retail priority 5
+  [DONE] LoadingManager integrated + tested at retail priority 6
+  [DONE] PlatPadUpdateTask integrated + tested at retail priority 3
+  [DONE] DispatchEventsTask integrated + tested at retail priority 20
+  [DONE] ComUpdateTask integrated + tested at retail priority 16
+  [AUDITED] WorldUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] ParticleUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] FrontEndTask focused runtime validated; production integration deferred
+  [AUDITED] TweakerTask focused runtime validated; production integration deferred
+  [AUDITED] AudioUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] EndFrameTask focused runtime validated; production integration deferred
+  [AUDITED] GameRenderTask audited only; no PC wrapper/runtime; production integration deferred
+  [DEFERRED] ResetTask / TransitionTask / BeginFrameTask / FixedUpdateTask / TestTask
+  [NEXT] move from isolated task scheduling toward a coherent missing subsystem/lifecycle:
+         FE/world lifecycle, retail frame lifecycle, or full audio runtime
+
+
+PC input / pad bring-up
+  [DONE] Aurora PAD backend linked into smstrikers_pc
+  [DONE] PC PADStatus layout matched to Aurora ABI
+         TARGET_PC PADStatus includes extButton
+  [DONE] platpad.cpp portability for MSVC/x64
+         PPC-only deadzone asm replaced by PC C++ path
+         __cntlzw replaced by std::countl_zero on TARGET_PC
+  [DONE] globalpad.cpp + platpad.cpp compiled in smstrikers_pcinput_runtime
+  [DONE] PadActions.cpp + PadMonkey.cpp compiled in smstrikers_pcinput_runtime
+  [DONE] PC-safe cPlatPad allocation uses sizeof(cPlatPad)
+  [DONE] PC-safe PadMonkey allocation uses sizeof(PadMonkey)
+  [DONE] retail GameCube allocation literals preserved under non-PC builds
+  [DONE] glx_GetTargetFPS() PC implementation returns 60
+  [DONE] InitPads() linked into the real PC startup bridge
+  [DONE] AIPadManager::Startup() linked after InitPads()
+  [DONE] FEInput::Initialize() linked after AIPadManager startup
+  [DONE] FlickDetection::Initialize() linked into PC startup
+  [DONE] glplat prestartup test include-path regression fixed
+  [DONE] native PC frame-loop polling decision established
+  [DONE] smstrikers_pc_pad_update() now performs:
+         VBlankPadUpdate()
+         nlTaskManager::RunAllTasks()
+  [DONE] PCInputUpdateTask runs through nlTaskManager
+  [DONE] PCInputUpdateTask runtime behavior validated
+  [DONE] task dispatch runtime validated
+  [DONE] input task remains active across the initial state transition
+
+  PCInputUpdateTask current body:
+    UseDefaultPad()
+    UpdatePlatPad(dt)
+    cPadManager::Update(dt)
+    FlickDetection::Update()
+
+  PCInputUpdateTask registration:
+    priority     7
+    statesActive -1
+
+  Current PC frame path:
+    aurora_begin_frame
+      ↓
+    smstrikers_pc_pad_update()
+      ↓
+    VBlankPadUpdate()
+      ↓
+    nlTaskManager::RunAllTasks()
+      ↓
+    PCInputUpdateTask
+      ↓
+    draw()
+      ↓
+    aurora_end_frame
+
+  x64 layout audit:
+    sizeof(cGlobalPad) = 32
+    sizeof(cPlatPad)   = 32
+    sizeof(PadMonkey)  = 232
+
+  Important:
+    Retail hard-coded allocation sizes were 0x1C for cPlatPad and
+    0xD8 for PadMonkey. Those are too small for the MSVC x64 layouts,
+    so TARGET_PC now allocates with sizeof(...) while GameCube keeps
+    the original retail constants.
+
+  Retail PAD callback model:
+    SISetSamplingRate(0)
+    PADSetSamplingCallback(VBlankPadUpdate)
+
+  Current PC decision:
+    Aurora does not expose the exact retail SISetSamplingRate /
+    PADSetSamplingCallback model, so the PC port does not fake those APIs.
+    Instead, VBlankPadUpdate() is called explicitly once per native frame
+    before nlTaskManager::RunAllTasks().
+
+  Controller validation:
+    Real end-to-end physical controller validation is still pending.
+    A PS4 controller will be connected when that stage is reached.
+
+
+Retail task graph — audited reference
+  Reset             priority 0    states -1
+  Transition        priority 1    states -1
+  BeginFrame        priority 2    states -1
+  PlatPadUpdate     priority 3    states -1
+  ClockUpdate       priority 5    states -1
+  LoadingManager    priority 6    states -1
+  FixedUpdate       priority 7    states -1
+  WorldUpdate       priority 8    states 0x20013
+  GameRender        priority 10   states 0x20113
+  ParticleUpdate    priority 11   states 0x20113
+  FrontEnd          priority 12   states 0x117
+  Tweaker           priority 13   states -1
+  AudioUpdate       priority 14   states -1
+  EndFrame          priority 15   states -1
+  ComUpdate         priority 16   states -1 optional
+  TestTask          priority 18   states -1 optional
+  DispatchEvents    priority 20   states -1
+
+  Retail main loop:
+    for (;;)
+    {
+        nlTaskManager::RunAllTasks();
+        UpdateProfile();
+    }
+
+  Current restoration policy:
+    Restore the retail task graph incrementally.
+    Do not enable large gameplay/world tasks simply because they compile.
+    Each task gets an isolated dependency audit, focused validation,
+    PC runtime smoke, and GameCube baseline check.
+
+
+Current task frontier — audited retail task graph
+
+  Current task ledger:
+
+    Reset             priority 0    states -1       [DEFERRED]
+    Transition        priority 1    states -1       [DEFERRED]
+    BeginFrame        priority 2    states -1       [DEFERRED]
+    PlatPadUpdate     priority 3    states -1       [DONE] integrated + tested
+    ClockUpdate       priority 5    states -1       [DONE] integrated + tested
+    LoadingManager    priority 6    states -1       [DONE] integrated + tested
+    FixedUpdate       priority 7    states -1       [DEFERRED]
+    WorldUpdate       priority 8    states 0x20013  [AUDITED] focused runtime validated; deferred
+    GameRender        priority 10   states 0x20113  [AUDITED] no PC wrapper/runtime; deferred
+    ParticleUpdate    priority 11   states 0x20113  [AUDITED] focused runtime validated; deferred
+    FrontEnd          priority 12   states 0x117    [AUDITED] focused runtime validated; deferred
+    Tweaker           priority 13   states -1       [AUDITED] focused runtime validated; deferred
+    AudioUpdate       priority 14   states -1       [AUDITED] focused runtime validated; deferred
+    EndFrame          priority 15   states -1       [AUDITED] focused runtime validated; deferred
+    ComUpdate         priority 16   states -1       [DONE] integrated + tested
+    TestTask          priority 18   states -1       [DEFERRED / optional]
+    DispatchEvents    priority 20   states -1       [DONE] integrated + tested
+
+  Closed integration commits:
+    7fc38ffc  Integrate PC dispatch events task runtime
+    623296b3  Integrate PC PlatPad update task runtime
+    cdae6f31  Integrate PC Com update task runtime
+
+  Focused validation commits:
+    14221738  Validate PC world update task runtime
+    915e9c71  Validate PC particle update task runtime
+    011d5f9d  Validate PC front-end task runtime
+    44a0141b  Validate PC tweaker task runtime
+    2aa086bf  Validate PC audio update task runtime
+    91df0729  Validate PC end-frame task runtime
+
+  Important architectural conclusion:
+    The remaining tasks are no longer blocked mainly by small compilation
+    fixes. They are blocked by larger subsystem/lifecycle ownership:
+
+      Render/frame:
+        BeginFrame / GameRender / ParticleUpdate / EndFrame
+        → Aurora currently owns begin/end-frame.
+
+      FE/world/game:
+        Transition / FrontEnd / WorldUpdate / FixedUpdate
+        → full FE/world/game state machinery and production bridges are not yet linked.
+
+      Subsystem completeness:
+        AudioUpdate
+        → real src/Game/Audio/audio.cpp is not in the main PC target.
+
+        Tweaker
+        → retail g_bTweaking lifecycle/global is not yet ported.
+
+  Latest exact audit result:
+    Search for PC/CMake wiring of:
+      src/Game/FE/feManager.cpp
+      src/Game/WorldManager.cpp
+    returned:
+      Gol
+
+  Therefore WorldUpdate remains intentionally deferred.
+
+
+Task-manager / state restoration
+  [DONE] nlTaskManager::Startup(0x10000)
+  [DONE] RunAllTasks() runtime test
+  [DONE] dispatch by priority / active-state mask validated
+  [DONE] StateTransition(from, to) callback behavior validated
+  [DONE] m_PrevState / m_CurrState / m_PendingState commit behavior validated
+  [DONE] transition 0x10000 → 4 validated in focused test
+  [DONE] task mask behavior after transition validated
+  [DONE] PC startup now stages the same retail initial state decision:
+         nlTaskManager::SetNextState(
+             GetConfigBool(Config::Global(), "skipfe", false) ? 2 : 4
+         )
+  [DONE] runtime smoke after restoring initial task state
+         stable blue framebuffer
+         clean Alt+F4
+         exit=0
+
+  Important:
+    SetNextState() only stages m_PendingState.
+    The actual transition occurs on the next RunAllTasks(), matching the
+    retail startup model.
+
+
+MusyX / audio x64 bring-up
+  [DONE] MusyX source imported into the native PC build
+  [DONE] MusyX static library builds under MSVC x64
+  [DONE] PC audio runtime links into smstrikers_pc
+  [DONE] 02C40A — MSVC-safe pack scopes in seq.h / synth.h
+  [DONE] 02C40B — MSVC-safe inline_depth scope in stream.c
+  [DONE] 02C40C — GCC diagnostic pragmas guarded from MSVC
+  [DONE] C4103 packing/alignment warning frontier removed from these headers
+  [DONE] C4068 pragma warning frontier removed from MusyX targeted build
+  [DONE] GameCube / MWCC behavior preserved after all three fixes
+  [DONE] FE audio lookup is validated during PC startup
+  [DONE] FEStreamConfig is validated during PC startup
+  [DONE] platform audio startup bridge is validated during PC startup
+
+  Last audited targeted MusyX warning frontier:
+    10x C4311 pointer truncation
+     1x C4028 formal parameter mismatch
+
+  Important:
+    MusyX is very substantially imported and build-integrated on PC,
+    but "full imported" does not yet mean "fully functional native audio".
+    ARAM / DSP / address-width assumptions still contain Dolphin-era
+    32-bit semantics that must be adapted carefully for x64.
+
+
+Recent validation anchors
+  [PASS] full Release PC build after input/task integration
+  [PASS] smstrikers_pcinput_runtime build
+  [PASS] smstrikers_pc.exe link
+  [PASS] smstrikers_pctask_test
+         output:
+           PC nlTaskManager runtime: PASS
+  [PASS] smstrikers_pcinput_task_test
+         output:
+           PC input task runtime: PASS
+  [PASS] smstrikers_glplat_prestartup_test.exe
+         output:
+           glplatPreStartup : true
+           PASS
+  [PASS] runtime smoke from orig\G4QE01\files
+  [PASS] stable blue framebuffer
+  [PASS] Alt+F4 clean shutdown
+  [PASS] exit=0
+  [PASS] initial task-state runtime smoke after SetNextState integration
+  [PASS] ClockUpdateTask integration + focused validation
+  [PASS] LoadingManager integration + focused validation
+  [PASS] DispatchEventsTask integration + focused validation
+  [PASS] PlatPadUpdateTask integration + focused validation
+  [PASS] ComUpdateTask integration + focused validation
+  [PASS] focused WorldUpdateTask runtime validation
+  [PASS] focused ParticleUpdateTask runtime validation
+  [PASS] focused FrontEndTask runtime validation
+  [PASS] focused TweakerTask runtime validation
+  [PASS] focused AudioUpdateTask runtime validation
+  [PASS] focused EndFrameTask runtime validation
+  [PASS] GameCube reference baseline after later PC task integrations
+  [PASS] 731 / 731 files linked
+  [PASS] 8605 / 8605 functions
+  [PASS] Code: 2662332 / 2662332 bytes
+  [PASS] Data: 960203 / 961907 bytes — 99.82%
+  [PASS] 250 / 250 Fans
+  [PASS] 90 / 90 Megastrikes
+
+  Diagnostic note — 08.09.2026:
+    Launching smstrikers_pc.exe from the repository root failed at
+    global texture load because glplatLoadTextureBundle("global.glt")
+    opens "art/global.glt" through nlOpen(), and PCFile::Open() currently
+    uses std::fopen() relative to the process working directory.
+
+    Launching from orig\G4QE01\files immediately restored the expected
+    startup path and exit=0. This was confirmed not to be a regression
+    caused by PC_TASK_04 / SetNextState.
+
+    Temporary diagnostic instrumentation was removed and was not committed.
+
+
+Recent commits — task/input restoration
+  90dee016  Validate PC task dispatch runtime
+  6f509a02  Run PC input processing through task manager
+  c7656ff3  Validate PC input task processing
+  4890396e  Validate PC task state transition
+  9d560b71  Restore PC initial task state
+
+Recent commits — retail task graph bring-up
+  14221738  Validate PC world update task runtime
+  915e9c71  Validate PC particle update task runtime
+  011d5f9d  Validate PC front-end task runtime
+  44a0141b  Validate PC tweaker task runtime
+  2aa086bf  Validate PC audio update task runtime
+  91df0729  Validate PC end-frame task runtime
+  7fc38ffc  Integrate PC dispatch events task runtime
+  623296b3  Integrate PC PlatPad update task runtime
+  cdae6f31  Integrate PC Com update task runtime
+
+
+Earlier Aquila Surgit / PC input bring-up commits
+  8122cc3a  Fix pad monkey layout ownership
+  e880f35c  Match PC PADStatus Aurora ABI
+  f1c428e6  Link Aurora PAD backend
+  0f68cbbe  Add PC platpad portability
+  bc0d5f72  Add PC target FPS query
+  5068be44  Add PC input runtime
+  09b9a85e  Use PC-safe pad allocation sizes
+  42e1f42b  Extend PC input runtime
+  764eadd7  Initialize PC pads during startup
+  ebbe096d  Fix glplat prestartup test include paths
+
+
+Earlier renderer / startup commits still relevant
+  2e871c77  Add PC glxTarget startup boundary
+  d027d9a3  Integrate PC global texture startup
+  ed655062  Validate PC FE audio lookup during startup
+
+
+Deferred dependency / architecture frontiers
+  [AUDITED] FrontEnd::FEEventHandler
+  [AUDITED] OverlayManager::FEEventHandler
+  [AUDITED] FEAudioEventHandler
+  [AUDITED] Audio::AudioEventHandler
+
+  These remain intentionally deferred until their real FE/audio
+  dependencies are available — no fake stubs / no skipped logic.
+
+  [DEFERRED] full retail FixedUpdateTask
+  Reason:
+    It reaches substantially deeper gameplay/world/physics/ball/replay
+    dependencies and is not a safe next bring-up step.
+
+  [DEFERRED] exact GameCube PAD callback API emulation
+  Reason:
+    The native frame loop now has an explicit, validated polling bridge.
+    There is no reason to invent SISetSamplingRate /
+    PADSetSamplingCallback shims merely to imitate the API surface.
+
+
+PC executable:
+  build-pc\Release\smstrikers_pc.exe
+
+Required retail runtime working directory:
+  orig\G4QE01\files
+
+
+Current visual state:
+  clean blue framebuffer
+  no crash
+  clean Alt+F4 shutdown
+  exit=0
+
+  Important:
+    No genuine game scene is rendered yet.
+    The blue framebuffer remains the current expected visual checkpoint.
+
+
+Current startup reached:
+  Aurora / WebGPU
+      ↓
+  GL / GLX startup
+      ↓
+  global.glt + 46/46 global texture registration
+      ↓
+  retail config files
+      ↓
+  EventManager
+      ↓
+  nlTaskManager::Startup(0x10000)
+      ↓
+  tDebugPrintManager
+      ↓
+  ClockManager::Initialize()
+      ↓
+  PC audio / FE audio startup validation
+      ↓
+  glResourceMark()
+      ↓
+  glInventory.Create()
+      ↓
+  InitPads()
+      ↓
+  AIPadManager::Startup()
+      ↓
+  FEInput::Initialize()
+      ↓
+  FlickDetection::Initialize()
+      ↓
+  PCInputUpdateTask registration
+      ↓
+  nlTaskManager::SetNextState(skipfe ? 2 : 4)
+      ↓
+  first native frame
+      ↓
+  VBlankPadUpdate()
+      ↓
+  nlTaskManager::RunAllTasks()
+      ↓
+  initial retail state transition + PCInputUpdateTask dispatch
+      ↓
+  stable blue framebuffer
+
+
+Immediate next checkpoint
+
+  The isolated retail-task audit is now substantially closed.
+
+  Do NOT jump directly into another task merely because its focused test builds.
+
+  Choose one coherent subsystem/lifecycle frontier and audit it end-to-end:
+
+    Option A — FE / world lifecycle foundation
+      feManager.cpp
+      WorldManager.cpp
+      state transitions
+      real WorldUpdate production bridge
+
+    Option B — retail frame lifecycle migration
+      BeginFrame
+      GameRender
+      ParticleUpdate
+      EndFrame
+      reconcile retail ownership with Aurora begin/end-frame
+
+    Option C — full audio runtime
+      src/Game/Audio/audio.cpp
+      dependency closure
+      then reconsider AudioUpdateTask
+
+  Current recommendation:
+    prefer a coherent subsystem foundation over further isolated scheduler entries.
+
+
+GameCube reference remains intact:
+
+  731 / 731 files
+  8605 / 8605 functions
+  Code: 2662332 / 2662332 bytes
+  Data: 960203 / 961907 bytes — 99.82%
+
+  250 / 250 Fans
+   90 /  90 Megastrikes
+
+
+Repository checkpoint
+  Branch:
+    pc-port
+
+  Latest closed code checkpoint:
+    cdae6f31  Integrate PC Com update task runtime
+
+  Code changes:
+    committed
+
+  Known intentionally untouched Progress document state:
+     D "Super Mario Strikers PC Port – Progress.md"
+    ?? "Super Mario Strikers PC Port - Progress.md"
+
+  Do NOT stage these two entries as part of PC-port code commits.
+
+
+High-level interpretation — 11.09.2026
+
+  Project LUDUS has progressed from merely restoring the task manager
+  into a substantially audited reconstruction of the retail task graph.
+
+  The native PC executable now has:
+    - stable Aurora/WebGPU platform bring-up
+    - retail filesystem/config startup
+    - global texture metadata loading
+    - EventManager + nlTaskManager
+    - real retail-derived pad/input runtime
+    - active task dispatch every native frame
+    - restored initial retail state transition semantics
+    - integrated ClockUpdate / LoadingManager / PlatPadUpdate /
+      DispatchEvents / ComUpdate task paths
+    - focused validated wrappers for WorldUpdate / ParticleUpdate /
+      FrontEnd / Tweaker / AudioUpdate / EndFrame
+
+  The main conclusion from the latest audit is architectural:
+  the remaining task graph cannot be completed safely by adding isolated
+  registrations one by one.
+
+  Render-related tasks are blocked by frame ownership:
+    Aurora currently owns:
+      aurora_begin_frame()
+      ...
+      aurora_end_frame()
+
+    while the retail graph expects:
+      BeginFrameTask
+      GameRenderTask
+      ParticleUpdateTask
+      EndFrameTask
+
+  FE/world-related tasks are blocked by missing production runtime wiring:
+    src/Game/FE/feManager.cpp
+    src/Game/WorldManager.cpp
+    were confirmed not to be wired into the main PC target.
+
+  AudioUpdate is blocked because the real:
+    src/Game/Audio/audio.cpp
+  implementation is not yet part of the main PC runtime.
+
+  Tweaker remains deferred because the retail g_bTweaking lifecycle/global
+  is not yet ported.
+
+  The largest gap before Prima Lux remains genuine rendering:
+    real retail render payloads must eventually flow through the native
+    WebGPU path, with frame lifecycle ownership reconciled correctly.
+
+  Rough overall native-port completion:
+    ~25–30% toward a polished Triumphus-quality port.
+
+  Rough position toward the first real rendered game frame (Prima Lux):
+    ~65%.
+
+  Aquila Surgit itself:
+    ~91% complete.
+
+  Exact latest handoff point:
+    WorldUpdateTask remains deferred after the final wiring audit returned:
+      Gol
+    for:
+      src/Game/FE/feManager.cpp
+      src/Game/WorldManager.cpp
+
+  Next work should begin from that architectural checkpoint rather than
+  reopening already-classified individual tasks.
