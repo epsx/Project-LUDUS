@@ -1,0 +1,1226 @@
+------------ UPDATE STATE PROJECT - 18.09.2026 ---------------
+Project LUDUS
+Super Mario Strikers native PC port
+
+Campaigns / milestones:
+  Pax Matrixa      → matrix subsystem
+  Aquila Surgit    → renderer + retail startup bring-up
+  Rubicon LXIV     → BMD / 32-bit → x64 conversion
+  Prima Lux        → first real rendered game frame
+  Roma Victrix     → first playable in-game scene / match
+  Triumphus        → major native-PC milestone
+
+
+Project LUDUS — Current Campaign: Aquila Surgit
+
+
+Project LUDUS — rough progress
+
+Infrastructure / platform foundation   ███████████████████░  ~96–97%
+Pax Matrixa                            ████████████████████  100%
+Aquila Surgit                          ███████████████████░  ~95–96%
+Rubicon LXIV                           ██████████░░░░░░░░░░  ~50%
+Prima Lux                              ██████████████░░░░░░  ~70% toward it
+Roma Victrix                           █████░░░░░░░░░░░░░░░  ~25%
+Triumphus / final polished port        ██████░░░░░░░░░░░░░░  ~30%
+
+
+============================================================
+Renderer / platform startup
+============================================================
+
+  [DONE] Aurora native window / WebGPU / D3D12
+  [DONE] PC memory runtime
+  [DONE] PC filesystem runtime
+  [DONE] matrix subsystem / Pax Matrixa
+  [DONE] GL / GLX startup foundation
+  [DONE] GL target startup
+  [DONE] GL view startup
+  [DONE] GL font startup
+  [DONE] GL constant startup
+  [DONE] global.glt loading
+  [DONE] 46/46 global textures decoded and registered
+  [DONE] PC startup smoke path stable from retail working directory
+  [DONE] clean Alt+F4 shutdown / exit=0
+  [DONE] PC target FPS query available (60 Hz)
+
+  [DONE] PC GL user-data runtime
+  [DONE] PC model runtime ABI foundation
+  [DONE] PC GL mesh-writer runtime
+  [DONE] ShapeRenderer startup integrated
+  [DONE] DepthOfFieldManager startup integrated
+  [DONE] FlareHandler startup integrated
+  [DONE] glApp startup core integrated
+  [DONE] BeginFrame skinning startup configuration integrated
+  [DONE] SetupViews integrated at the retail startup position
+  [DONE] production smoke remains stable after SetupViews integration
+
+  [DONE] PC texture-existence shim for startup:
+         pc/NL/gl/glTexture_pc.cpp
+         glTextureLoad(handle)
+           → smstrikers_pc_glx_find_texture(handle) != NULL
+
+  Important:
+    The PC shim intentionally implements only glTextureLoad() for the
+    currently required startup semantics.
+
+    It does NOT invent premature PC implementations for:
+      glTextureReplace()
+      glTextureGetNumBits()
+      glTextureGetHeight()
+      glTextureGetWidth()
+
+    Those retail wrappers depend on glplatTexture* behavior that is still
+    excluded on TARGET_PC and should be ported only when their real runtime
+    users enter the production closure.
+
+  [KNOWN] PC file opens are currently relative to process working directory.
+          PCFile::Open() uses std::fopen(filename, "rb") directly
+          and nlInitFileSystem() does not establish an asset root.
+
+  [KNOWN] therefore smstrikers_pc.exe must currently be launched from:
+          orig\G4QE01\files
+
+  [TODO] eventual PC asset-root / packaging policy independent of CWD
+  [TODO] actual GC texture payload upload/conversion to WebGPU
+  [TODO] real model/material/resource flow into the native renderer
+
+
+============================================================
+Retail startup sequence
+============================================================
+
+  [DONE] Config runtime x64 compatibility
+  [DONE] common.ini loading
+  [DONE] platform.ini / locale.ini / user.ini handling
+
+  [DONE] UserOptions startup core
+  [DONE] localization startup
+  [DONE] language startup
+  [DONE] PC NL random-state seeding
+
+  [DONE] EventManager runtime
+  [DONE] EventManager::Create(128, 64)
+
+  [DONE] nlTaskManager runtime
+  [DONE] nlTaskManager::Startup(0x10000)
+  [DONE] nlTaskManager task dispatch runtime validated
+  [DONE] nlTaskManager state-transition callback/commit semantics validated
+  [DONE] retail initial pending state restored on PC:
+         skipfe ? 2 : 4
+
+  [DONE] retail SimpleParser PC compatibility
+  [DONE] retail tDebugPrintManager runtime
+  [DONE] PrintCfg.txt parsing validation
+  [DONE] tDebugPrintManager::Initialize() integrated
+
+  [DONE] ClockManager::Initialize() integrated
+
+  [DONE] FE audio lookup startup validation integrated
+  [DONE] FEStreamConfig startup validation integrated
+  [DONE] platform audio startup validation integrated
+
+  [DONE] glResourceMark()
+  [DONE] glInventory.Create()
+
+  [DONE] InitPads()
+  [DONE] AIPadManager::Startup()
+  [DONE] FEInput::Initialize()
+  [DONE] FlickDetection::Initialize()
+
+  [DONE] PC input update task registered with nlTaskManager
+  [DONE] first real PC nlTaskManager::RunAllTasks() path active in frame loop
+
+  [DONE] ClockUpdateTask integrated + tested at retail priority 5
+  [DONE] LoadingManager integrated + tested at retail priority 6
+  [DONE] PlatPadUpdateTask integrated + tested at retail priority 3
+  [DONE] DispatchEventsTask integrated + tested at retail priority 20
+  [DONE] ComUpdateTask integrated + tested at retail priority 16
+
+  [AUDITED] WorldUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] ParticleUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] FrontEndTask focused runtime validated; production integration deferred
+  [AUDITED] TweakerTask focused runtime validated; production integration deferred
+  [AUDITED] AudioUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] EndFrameTask focused runtime validated; production integration deferred
+  [AUDITED] GameRenderTask audited only; no PC wrapper/runtime; production integration deferred
+
+  [DEFERRED] ResetTask
+  [DEFERRED] TransitionTask
+  [DEFERRED] full retail BeginFrameTask
+  [DEFERRED] FixedUpdateTask
+  [DEFERRED] TestTask
+
+  Additional retail startup tail now connected:
+    [DONE] memory-card icon startup
+    [DONE] GameInfoManager startup
+    [DONE] StatsTracker startup
+    [DONE] AddTasks() selective PC task registration path
+    [DONE] SetupViews()
+    [DONE] ShapeRenderer::Initialize()
+    [DEFERRED] Wiper::Initialize()
+    [DONE] DepthOfFieldManager::Initialize()
+    [DONE] FlareHandler::Initialize()
+    [DONE] glAppStartup()
+
+  Wiper remains intentionally deferred.
+
+  Reason:
+    Wiper opens the larger model/resource closure:
+      .glt
+      .fx
+      .glg
+      .sanim
+      .shier
+
+    That dependency frontier should be addressed deliberately rather than
+    pulled into startup through stubs or incomplete resource behavior.
+
+
+============================================================
+SetupViews integration — CLOSED 18.09.2026
+============================================================
+
+Retail ordering:
+
+  AddTasks();
+
+  SetupViews();
+  g_ShapeRenderer.Initialize();
+  Wiper::Instance().Initialize();
+  DepthOfFieldManager::instance.Initialize();
+  FlareHandler::instance.Initialize();
+  glAppStartup();
+
+
+PC ordering now preserves the important retail relationship:
+
+  AddTasks / task registration
+      ↓
+  smstrikers_pc_setup_views()
+      ↓
+  g_ShapeRenderer.Initialize()
+      ↓
+  [Wiper deferred]
+      ↓
+  DepthOfFieldManager::instance.Initialize()
+      ↓
+  FlareHandler::instance.Initialize()
+      ↓
+  glAppStartup()
+
+
+SetupViews behavior mirrored on PC:
+
+  [DONE] all GL views target GLTG_Main
+
+  [DONE] GLV_FrontEnd sort:
+         GLVSort_TransformedDepth
+
+  [DONE] GLV_Anark sort:
+         GLVSort_Reverse
+
+  [DONE] exact retail sort-none list:
+         GLV_Shadow0
+         GLV_Shadow1
+         GLV_UnsortedPerspective
+         GLV_InvisiblePlane
+         GLV_ElectricFence
+         GLV_UnsortedOrtho
+         GLV_ShadowBlend0
+         GLV_ShadowBlend1
+         GLV_Debug
+         GLV_Transitions
+         GLV_CoPlanar0
+         GLV_CoPlanar
+
+  [DONE] exact retail disabled-view list:
+         GLV_ShadowBlend0
+         GLV_ShadowBlend1
+         GLV_ScreenBlur
+         GLV_ScreenBlur2
+
+  [DONE] target/warble texture existence probe
+
+  [DONE] if warble texture is absent:
+         GLV_Warble disabled
+         GLV_WarbleBlend disabled
+
+  [DONE] exact retail depth-clear list:
+         GLV_CameraSpace
+         GLV_Transitions
+         GLV_Transitions3D
+         GLV_Anark3D_BG
+         GLV_Anark3D_FG
+
+  [DONE] ParticleSystem::ClearViews()
+  [DONE] ParticleSystem::AddView(GLV_Particles)
+
+  [DONE] real retail static preserved:
+         ModeledScreenTransition::s_3DView
+
+  [DONE] final transition view:
+         GLV_Transitions3D
+
+
+PC storage strategy:
+
+  ParticleSystem:
+    real retail statics preserved:
+      eGLView ParticleSystem::m_eViews[8]
+      int ParticleSystem::m_nNumViews
+
+    exact startup methods supplied:
+      ParticleSystem::ClearViews()
+      ParticleSystem::AddView()
+
+  ModeledScreenTransition:
+    real static preserved:
+      ModeledScreenTransition::s_3DView
+
+    ModelTransition.h is compiled only in the isolated PC storage TU with:
+      /Zc:twoPhase-
+
+    This avoids changing retail headers merely to satisfy normal MSVC
+    two-phase template parsing.
+
+
+Focused SetupViews validation:
+
+  build:
+    smstrikers_pcsetupviews_test.exe
+    exit=0
+
+  runtime:
+    PC SetupViews: PASS
+    exit=0
+
+  Test verifies:
+    - all 34 targets = GLTG_Main
+    - exact sort modes
+    - exact disabled views
+    - target/warble name + handle path
+    - exact depth-clear views
+    - ParticleSystem::m_nNumViews == 1
+    - ParticleSystem::m_eViews[0] == GLV_Particles
+    - ModeledScreenTransition::s_3DView == GLV_Transitions3D
+
+Production validation after SetupViews:
+
+  [PASS] Release smstrikers_pc build
+  [PASS] smstrikers_pc.exe link
+  [PASS] runtime smoke from orig\G4QE01\files
+  [PASS] stable blue framebuffer
+  [PASS] no SetupViews startup crash/assert/error
+  [PASS] clean shutdown
+  [PASS] exit=0
+  [PASS] git diff --check
+  [PASS] git diff --cached --check
+
+
+============================================================
+PC input / pad bring-up
+============================================================
+
+  [DONE] Aurora PAD backend linked into smstrikers_pc
+  [DONE] PC PADStatus layout matched to Aurora ABI
+         TARGET_PC PADStatus includes extButton
+
+  [DONE] platpad.cpp portability for MSVC/x64
+         PPC-only deadzone asm replaced by PC C++ path
+         __cntlzw replaced by std::countl_zero on TARGET_PC
+
+  [DONE] globalpad.cpp + platpad.cpp compiled in smstrikers_pcinput_runtime
+  [DONE] PadActions.cpp + PadMonkey.cpp compiled in smstrikers_pcinput_runtime
+
+  [DONE] PC-safe cPlatPad allocation uses sizeof(cPlatPad)
+  [DONE] PC-safe PadMonkey allocation uses sizeof(PadMonkey)
+
+  [DONE] retail GameCube allocation literals preserved under non-PC builds
+
+  [DONE] glx_GetTargetFPS() PC implementation returns 60
+
+  [DONE] InitPads() linked into the real PC startup bridge
+  [DONE] AIPadManager::Startup() linked after InitPads()
+  [DONE] FEInput::Initialize() linked after AIPadManager startup
+  [DONE] FlickDetection::Initialize() linked into PC startup
+
+  [DONE] glplat prestartup test include-path regression fixed
+  [DONE] native PC frame-loop polling decision established
+
+  [DONE] smstrikers_pc_pad_update() now performs:
+         VBlankPadUpdate()
+         nlTaskManager::RunAllTasks()
+
+  [DONE] PCInputUpdateTask runs through nlTaskManager
+  [DONE] PCInputUpdateTask runtime behavior validated
+  [DONE] task dispatch runtime validated
+  [DONE] input task remains active across the initial state transition
+
+
+PCInputUpdateTask current body:
+
+  UseDefaultPad()
+  UpdatePlatPad(dt)
+  cPadManager::Update(dt)
+  FlickDetection::Update()
+
+
+PCInputUpdateTask registration:
+
+  priority      7
+  statesActive -1
+
+
+Current PC frame path:
+
+  aurora_begin_frame
+      ↓
+  smstrikers_pc_pad_update()
+      ↓
+  VBlankPadUpdate()
+      ↓
+  nlTaskManager::RunAllTasks()
+      ↓
+  PCInputUpdateTask
+      ↓
+  draw()
+      ↓
+  aurora_end_frame
+
+
+x64 layout audit:
+
+  sizeof(cGlobalPad) = 32
+  sizeof(cPlatPad)   = 32
+  sizeof(PadMonkey)  = 232
+
+
+Important:
+
+  Retail hard-coded allocation sizes were:
+    cPlatPad   0x1C
+    PadMonkey  0xD8
+
+  Those are too small for the MSVC x64 layouts.
+
+  TARGET_PC therefore allocates with sizeof(...), while GameCube keeps
+  the original retail constants.
+
+
+Retail PAD callback model:
+
+  SISetSamplingRate(0)
+  PADSetSamplingCallback(VBlankPadUpdate)
+
+
+Current PC decision:
+
+  Aurora does not expose the exact retail SISetSamplingRate /
+  PADSetSamplingCallback model.
+
+  The PC port therefore does not fake those APIs.
+
+  VBlankPadUpdate() is called explicitly once per native frame before
+  nlTaskManager::RunAllTasks().
+
+
+Controller validation:
+
+  Real end-to-end physical controller validation is still pending.
+  A PS4 controller will be connected when that stage is reached.
+
+
+============================================================
+Retail task graph — audited reference
+============================================================
+
+  Reset             priority 0    states -1
+  Transition        priority 1    states -1
+  BeginFrame        priority 2    states -1
+  PlatPadUpdate     priority 3    states -1
+  ClockUpdate       priority 5    states -1
+  LoadingManager    priority 6    states -1
+  FixedUpdate       priority 7    states -1
+  WorldUpdate       priority 8    states 0x20013
+  GameRender        priority 10   states 0x20113
+  ParticleUpdate    priority 11   states 0x20113
+  FrontEnd          priority 12   states 0x117
+  Tweaker           priority 13   states -1
+  AudioUpdate       priority 14   states -1
+  EndFrame          priority 15   states -1
+  ComUpdate         priority 16   states -1 optional
+  TestTask          priority 18   states -1 optional
+  DispatchEvents    priority 20   states -1
+
+
+Retail main loop:
+
+  for (;;)
+  {
+      nlTaskManager::RunAllTasks();
+      UpdateProfile();
+  }
+
+
+Current restoration policy:
+
+  Restore the retail task graph incrementally.
+
+  Do not enable large gameplay/world tasks simply because they compile.
+
+  Each task gets:
+    - dependency audit
+    - focused validation
+    - PC runtime smoke
+    - GameCube baseline check
+
+
+============================================================
+Current task frontier — audited retail task graph
+============================================================
+
+Current task ledger:
+
+  Reset             priority 0    states -1       [DEFERRED]
+  Transition        priority 1    states -1       [DEFERRED]
+  BeginFrame        priority 2    states -1       [DEFERRED - full retail task]
+  PlatPadUpdate     priority 3    states -1       [DONE] integrated + tested
+  ClockUpdate       priority 5    states -1       [DONE] integrated + tested
+  LoadingManager    priority 6    states -1       [DONE] integrated + tested
+  FixedUpdate       priority 7    states -1       [DEFERRED]
+  WorldUpdate       priority 8    states 0x20013  [AUDITED] focused runtime validated; deferred
+  GameRender        priority 10   states 0x20113  [AUDITED] no PC wrapper/runtime; deferred
+  ParticleUpdate    priority 11   states 0x20113  [AUDITED] focused runtime validated; deferred
+  FrontEnd          priority 12   states 0x117    [AUDITED] focused runtime validated; deferred
+  Tweaker           priority 13   states -1       [AUDITED] focused runtime validated; deferred
+  AudioUpdate       priority 14   states -1       [AUDITED] focused runtime validated; deferred
+  EndFrame          priority 15   states -1       [AUDITED] focused runtime validated; deferred
+  ComUpdate         priority 16   states -1       [DONE] integrated + tested
+  TestTask          priority 18   states -1       [DEFERRED / optional]
+  DispatchEvents    priority 20   states -1       [DONE] integrated + tested
+
+
+Focused validation commits:
+
+  14221738  Validate PC world update task runtime
+  915e9c71  Validate PC particle update task runtime
+  011d5f9d  Validate PC front-end task runtime
+  44a0141b  Validate PC tweaker task runtime
+  2aa086bf  Validate PC audio update task runtime
+  91df0729  Validate PC end-frame task runtime
+
+
+Integrated task commits:
+
+  7fc38ffc  Integrate PC dispatch events task runtime
+  623296b3  Integrate PC PlatPad update task runtime
+  cdae6f31  Integrate PC Com update task runtime
+
+
+Important architectural conclusion:
+
+  The remaining task graph is no longer blocked mainly by small compile fixes.
+
+  It is blocked by larger subsystem/lifecycle ownership.
+
+
+Render/frame:
+
+  BeginFrame / GameRender / ParticleUpdate / EndFrame
+
+  Aurora currently owns:
+    aurora_begin_frame()
+    ...
+    aurora_end_frame()
+
+  Retail expects:
+    BeginFrameTask
+    GameRenderTask
+    ParticleUpdateTask
+    EndFrameTask
+
+
+FE/world/game:
+
+  Transition / FrontEnd / WorldUpdate / FixedUpdate
+
+  Full FE/world/game state machinery and production bridges are not yet linked.
+
+
+Subsystem completeness:
+
+  AudioUpdate
+    → real src/Game/Audio/audio.cpp is not yet in the main PC target.
+
+  Tweaker
+    → retail g_bTweaking lifecycle/global is not yet ported.
+
+
+WorldUpdate remains intentionally deferred.
+
+Retail behavior:
+
+  if current state == 1 and FE state != start screen:
+      WorldManager::UpdateWorld(0.f)
+  else:
+      WorldManager::UpdateWorld(dt)
+
+State mask:
+  0x20013
+
+Contains:
+  0x20000
+  0x10
+  0x2
+  0x1
+
+Does NOT contain:
+  0x4
+
+Critical lifecycle conclusion:
+
+  Retail TransitionTask prepares the world before WorldUpdate becomes
+  meaningful in state 2.
+
+  The PC startup currently stages:
+    skipfe ? 2 : 4
+
+  but does not yet reproduce the full TransitionTask/world-loader lifecycle.
+
+  Therefore:
+    DO NOT add null guards merely to hide missing lifecycle ownership.
+    DO NOT integrate WorldUpdate into production prematurely.
+
+
+============================================================
+Task-manager / state restoration
+============================================================
+
+  [DONE] nlTaskManager::Startup(0x10000)
+  [DONE] RunAllTasks() runtime test
+  [DONE] dispatch by priority / active-state mask validated
+  [DONE] StateTransition(from, to) callback behavior validated
+  [DONE] m_PrevState / m_CurrState / m_PendingState commit behavior validated
+  [DONE] transition 0x10000 → 4 validated in focused test
+  [DONE] task mask behavior after transition validated
+
+  [DONE] PC startup now stages the same retail initial state decision:
+
+         nlTaskManager::SetNextState(
+             GetConfigBool(Config::Global(), "skipfe", false) ? 2 : 4
+         )
+
+  [DONE] runtime smoke after restoring initial task state
+         stable blue framebuffer
+         clean Alt+F4
+         exit=0
+
+
+Important:
+
+  SetNextState() only stages m_PendingState.
+
+  The actual transition occurs on the next RunAllTasks(), matching the
+  retail startup model.
+
+
+============================================================
+MusyX / audio x64 bring-up
+============================================================
+
+  [DONE] MusyX source imported into the native PC build
+  [DONE] MusyX static library builds under MSVC x64
+  [DONE] PC audio runtime links into smstrikers_pc
+
+  [DONE] 02C40A — MSVC-safe pack scopes in seq.h / synth.h
+  [DONE] 02C40B — MSVC-safe inline_depth scope in stream.c
+  [DONE] 02C40C — GCC diagnostic pragmas guarded from MSVC
+
+  [DONE] C4103 packing/alignment warning frontier removed from these headers
+  [DONE] C4068 pragma warning frontier removed from MusyX targeted build
+
+  [DONE] GameCube / MWCC behavior preserved after all three fixes
+
+  [DONE] FE audio lookup is validated during PC startup
+  [DONE] FEStreamConfig is validated during PC startup
+  [DONE] platform audio startup bridge is validated during PC startup
+
+
+Last audited targeted MusyX warning frontier:
+
+  10x C4311 pointer truncation
+   1x C4028 formal parameter mismatch
+
+
+Important:
+
+  MusyX is very substantially imported and build-integrated on PC,
+  but "full imported" does not yet mean "fully functional native audio".
+
+  ARAM / DSP / address-width assumptions still contain Dolphin-era
+  32-bit semantics that must be adapted carefully for x64.
+
+
+============================================================
+Recent validation anchors
+============================================================
+
+  [PASS] full Release PC build after task/input integration
+  [PASS] full Release PC build after later startup-tail integrations
+
+  [PASS] smstrikers_pcinput_runtime build
+  [PASS] smstrikers_pc.exe link
+
+  [PASS] smstrikers_pctask_test
+         output:
+           PC nlTaskManager runtime: PASS
+
+  [PASS] smstrikers_pcinput_task_test
+         output:
+           PC input task runtime: PASS
+
+  [PASS] smstrikers_glplat_prestartup_test.exe
+         output:
+           glplatPreStartup : true
+           PASS
+
+  [PASS] ClockUpdateTask integration + focused validation
+  [PASS] LoadingManager integration + focused validation
+  [PASS] DispatchEventsTask integration + focused validation
+  [PASS] PlatPadUpdateTask integration + focused validation
+  [PASS] ComUpdateTask integration + focused validation
+
+  [PASS] focused WorldUpdateTask runtime validation
+  [PASS] focused ParticleUpdateTask runtime validation
+  [PASS] focused FrontEndTask runtime validation
+  [PASS] focused TweakerTask runtime validation
+  [PASS] focused AudioUpdateTask runtime validation
+  [PASS] focused EndFrameTask runtime validation
+
+  [PASS] UserOptions startup
+  [PASS] localization startup
+  [PASS] language startup
+  [PASS] memory-card icon startup
+
+  [PASS] ShapeRenderer startup
+  [PASS] DepthOfField startup
+  [PASS] FlareHandler startup
+  [PASS] glApp startup core
+  [PASS] BeginFrame skinning startup
+  [PASS] SetupViews focused runtime
+         output:
+           PC SetupViews: PASS
+           exit=0
+
+  [PASS] production Release build after SetupViews
+  [PASS] production runtime smoke after SetupViews
+  [PASS] stable blue framebuffer
+  [PASS] exit=0
+
+  [PASS] GameCube reference baseline after later PC integrations
+  [PASS] 731 / 731 files linked
+  [PASS] 8605 / 8605 functions
+  [PASS] Code: 2662332 / 2662332 bytes
+  [PASS] Data: 960203 / 961907 bytes — 99.82%
+  [PASS] 250 / 250 Fans
+  [PASS] 90 / 90 Megastrikes
+
+
+Diagnostic note — runtime CWD:
+
+  Launching smstrikers_pc.exe from the repository root fails at global
+  texture loading because:
+
+    glplatLoadTextureBundle("global.glt")
+
+  opens:
+
+    art/global.glt
+
+  through nlOpen(), and PCFile::Open() currently uses std::fopen()
+  relative to the process working directory.
+
+  Launching from:
+
+    orig\G4QE01\files
+
+  restores the expected startup path.
+
+  This is currently expected behavior, not a regression.
+
+
+============================================================
+Recent commits — retail task / input restoration
+============================================================
+
+  90dee016  Validate PC task dispatch runtime
+  6f509a02  Run PC input processing through task manager
+  c7656ff3  Validate PC input task processing
+  4890396e  Validate PC task state transition
+  9d560b71  Restore PC initial task state
+
+  14221738  Validate PC world update task runtime
+  915e9c71  Validate PC particle update task runtime
+  011d5f9d  Validate PC front-end task runtime
+  44a0141b  Validate PC tweaker task runtime
+  2aa086bf  Validate PC audio update task runtime
+  91df0729  Validate PC end-frame task runtime
+
+  7fc38ffc  Integrate PC dispatch events task runtime
+  623296b3  Integrate PC PlatPad update task runtime
+  cdae6f31  Integrate PC Com update task runtime
+
+
+============================================================
+Recent commits — startup / renderer bring-up
+============================================================
+
+  ae416cb5  Add PC UserOptions startup core
+  dbfa090e  Integrate PC localization startup
+  1a80db80  Integrate PC language startup
+  db4f0a04  Seed PC NL random state at startup
+
+  bce0fd68  Add PC GL user data runtime
+  9461d8e9  Define PC model runtime ABI
+  a1bc8453  Add PC GL mesh writer runtime
+
+  6b99785f  Integrate PC ShapeRenderer startup
+  9cf0c3f6  Integrate PC depth of field startup
+  ce332aad  Integrate PC flare handler startup
+  dfac630f  Integrate PC glApp startup core
+  fc1e55e6  Integrate PC BeginFrame skinning startup
+
+  16e0731f  Integrate PC memory card icon startup
+  e1a3b17c  Integrate PC SetupViews startup
+
+
+Earlier renderer / startup commits still relevant:
+
+  2e871c77  Add PC glxTarget startup boundary
+  d027d9a3  Integrate PC global texture startup
+  ed655062  Validate PC FE audio lookup during startup
+
+
+Earlier PC input bring-up commits:
+
+  8122cc3a  Fix pad monkey layout ownership
+  e880f35c  Match PC PADStatus Aurora ABI
+  f1c428e6  Link Aurora PAD backend
+  0f68cbbe  Add PC platpad portability
+  bc0d5f72  Add PC target FPS query
+  5068be44  Add PC input runtime
+  09b9a85e  Use PC-safe pad allocation sizes
+  42e1f42b  Extend PC input runtime
+  764eadd7  Initialize PC pads during startup
+  ebbe096d  Fix glplat prestartup test include paths
+
+
+============================================================
+Deferred dependency / architecture frontiers
+============================================================
+
+  [AUDITED] FrontEnd::FEEventHandler
+  [AUDITED] OverlayManager::FEEventHandler
+  [AUDITED] FEAudioEventHandler
+  [AUDITED] Audio::AudioEventHandler
+
+  These remain intentionally deferred until their real FE/audio
+  dependencies are available.
+
+  No fake stubs.
+  No skipped retail logic merely to make startup advance.
+
+
+[DEFERRED] full retail FixedUpdateTask
+
+Reason:
+  It reaches substantially deeper gameplay/world/physics/ball/replay
+  dependencies and is not a safe bring-up step yet.
+
+
+[DEFERRED] exact GameCube PAD callback API emulation
+
+Reason:
+  The native frame loop already has an explicit, validated polling bridge.
+
+  There is no reason to invent SISetSamplingRate /
+  PADSetSamplingCallback shims merely to imitate the API surface.
+
+
+[DEFERRED] Wiper startup
+
+Reason:
+  Wiper opens the next major model/resource dependency closure:
+    GLT / FX / GLG / SAnim / SHier
+
+  This is now one of the important remaining frontiers before real
+  renderer payloads can advance toward Prima Lux.
+
+
+============================================================
+PC executable
+============================================================
+
+  build-pc\Release\smstrikers_pc.exe
+
+
+Required retail runtime working directory:
+
+  orig\G4QE01\files
+
+
+============================================================
+Current visual state
+============================================================
+
+  clean blue framebuffer
+  no crash
+  clean shutdown
+  exit=0
+
+
+Important:
+
+  No genuine game scene is rendered yet.
+
+  The blue framebuffer remains the current expected visual checkpoint.
+
+  The project is now much deeper into retail startup than it was on
+  11.09.2026, but genuine rendering is still the decisive Prima Lux gap.
+
+
+============================================================
+Current startup reached — 18.09.2026
+============================================================
+
+  Aurora / WebGPU / D3D12
+      ↓
+  GL / GLX startup
+      ↓
+  global.glt + 46/46 global texture registration
+      ↓
+  retail config files
+      ↓
+  UserOptions
+      ↓
+  localization / language
+      ↓
+  EventManager
+      ↓
+  nlTaskManager::Startup(0x10000)
+      ↓
+  tDebugPrintManager
+      ↓
+  ClockManager::Initialize()
+      ↓
+  PC audio / FE audio startup validation
+      ↓
+  glResourceMark()
+      ↓
+  glInventory.Create()
+      ↓
+  InitPads()
+      ↓
+  AIPadManager::Startup()
+      ↓
+  FEInput::Initialize()
+      ↓
+  FlickDetection::Initialize()
+      ↓
+  PCInputUpdateTask registration
+      ↓
+  nlTaskManager::SetNextState(skipfe ? 2 : 4)
+      ↓
+  memory-card icon startup
+      ↓
+  GameInfoManager
+      ↓
+  StatsTracker
+      ↓
+  AddTasks() selective PC task registration
+      ↓
+  SetupViews()
+      ↓
+  ShapeRenderer::Initialize()
+      ↓
+  [Wiper deferred]
+      ↓
+  DepthOfFieldManager::Initialize()
+      ↓
+  FlareHandler::Initialize()
+      ↓
+  glAppStartup()
+      ↓
+  BeginFrame skinning startup configuration
+      ↓
+  first native frame
+      ↓
+  VBlankPadUpdate()
+      ↓
+  nlTaskManager::RunAllTasks()
+      ↓
+  initial retail state transition + active PC task dispatch
+      ↓
+  stable blue framebuffer
+
+
+============================================================
+Immediate next checkpoint
+============================================================
+
+The safe retail startup tail is now nearly exhausted.
+
+Completed around the current startup frontier:
+
+  Language
+  Memory-card icon
+  GameInfo
+  StatsTracker
+  selective AddTasks
+  SetupViews
+  ShapeRenderer
+  DepthOfField
+  FlareHandler
+  glApp
+  BeginFrame skinning startup
+
+
+The one obvious retail startup-tail hole is:
+
+  Wiper
+
+But Wiper should remain deferred until its real model/resource dependency
+closure is addressed deliberately.
+
+
+Recommended direction:
+
+  Move from "small safe startup call" integration into one coherent
+  renderer/resource frontier.
+
+
+Option A — model/resource closure toward Wiper / Prima Lux
+
+  Audit and bring up deliberately:
+    model loading
+    GLG
+    SAnim
+    SHier
+    FX
+    remaining GLT/material runtime
+
+  Goal:
+    make Wiper and real retail render resources possible without stubs.
+
+
+Option B — retail frame/render lifecycle
+
+  Reconcile:
+    BeginFrame
+    GameRender
+    ParticleUpdate
+    EndFrame
+
+  with Aurora ownership of:
+    aurora_begin_frame()
+    aurora_end_frame()
+
+
+Option C — FE/world lifecycle
+
+  Bring in:
+    TransitionTask lifecycle
+    feManager
+    WorldManager
+    world loaders / state transition ownership
+
+  then reconsider:
+    FrontEndTask
+    WorldUpdateTask
+    FixedUpdateTask
+
+
+Option D — full audio runtime
+
+  Bring in:
+    src/Game/Audio/audio.cpp
+    its real dependency closure
+
+  then reconsider:
+    AudioUpdateTask
+
+
+Current recommendation:
+
+  Prefer the model/resource/render closure that directly advances toward
+  Prima Lux, while keeping Wiper deferred until the dependency audit proves
+  that the closure is safe enough to integrate.
+
+
+============================================================
+GameCube reference remains intact
+============================================================
+
+  731 / 731 files
+  8605 / 8605 functions
+
+  Code:
+    2662332 / 2662332 bytes
+
+  Data:
+    960203 / 961907 bytes — 99.82%
+
+  250 / 250 Fans
+   90 /  90 Megastrikes
+
+
+============================================================
+Repository checkpoint — 18.09.2026
+============================================================
+
+Branch:
+
+  pc-port
+
+
+Latest closed code checkpoint:
+
+  e1a3b17c  Integrate PC SetupViews startup
+
+
+SetupViews checkpoint validation:
+
+  PC SetupViews: PASS
+  exit=0
+
+  production Release build:
+  exit=0
+
+  production smoke:
+  stable blue framebuffer
+  exit=0
+
+
+Code changes:
+
+  committed
+
+
+Known intentionally untouched working-tree state:
+
+   D "Super Mario Strikers PC Port ΓÇô Progress.md"
+  ?? "Super Mario Strikers PC Port - Progress.md"
+  ?? smstrikers-decomp-pc-port-61db53f7-2026-09-12.zip
+
+
+Do NOT stage these as part of normal PC-port code commits.
+
+
+============================================================
+High-level interpretation — 18.09.2026
+============================================================
+
+Project LUDUS has moved beyond the 11.09 checkpoint in an important way.
+
+The task-manager reconstruction remains valid, but the largest progress of
+the last week has been the retail startup / renderer tail.
+
+The native PC executable now has:
+
+  - stable Aurora/WebGPU/D3D12 platform bring-up
+  - retail filesystem/config startup
+  - global texture metadata loading
+  - EventManager + nlTaskManager
+  - real retail-derived pad/input runtime
+  - active task dispatch every native frame
+  - restored initial retail state transition semantics
+  - integrated core safe retail tasks
+  - UserOptions / localization / language startup
+  - memory-card icon startup
+  - GameInfoManager / StatsTracker startup
+  - PC GL user-data runtime
+  - model ABI foundation
+  - GL mesh-writer foundation
+  - SetupViews retail state initialization
+  - ShapeRenderer startup
+  - DepthOfField startup
+  - FlareHandler startup
+  - glApp startup core
+  - BeginFrame skinning startup configuration
+
+
+This materially changes the frontier.
+
+On 11.09, the project was still mainly deciding how far isolated task
+registrations could safely go.
+
+On 18.09, that task frontier is largely classified and the safe startup tail
+has been pushed close to its natural limit.
+
+The remaining blockers are now increasingly "real game" blockers:
+
+  1. model/resource closure
+  2. render payload flow into WebGPU
+  3. frame lifecycle ownership
+  4. FE/world/game lifecycle
+  5. full native audio behavior
+
+
+Wiper is a useful marker for this transition:
+
+  It is not deferred because its call is difficult.
+
+  It is deferred because integrating it correctly would pull the project
+  into the real model/resource system.
+
+That is precisely the kind of frontier now separating Aquila Surgit from
+Prima Lux.
+
+
+Current visual truth remains:
+
+  stable blue framebuffer
+  no genuine game scene yet
+
+
+Therefore the next major victory is no longer another small startup call.
+
+It is getting authentic retail model/material/render data far enough through
+the native PC renderer to produce the first real rendered frame.
+
+
+Rough overall native-port completion:
+
+  ~30% toward a polished Triumphus-quality port
+
+
+Rough position toward Prima Lux:
+
+  ~70%
+
+
+Aquila Surgit:
+
+  ~95–96% complete
+
+
+Exact latest handoff point:
+
+  e1a3b17c  Integrate PC SetupViews startup
+
+  SetupViews focused test:
+    PASS
+
+  production build:
+    PASS
+
+  production runtime smoke:
+    PASS
+
+  working tree after commit:
+    only the known Progress-document noise + retained backup zip
+
+
+Next work should begin from the renderer/resource architectural frontier,
+not by reopening already-closed startup integrations.
