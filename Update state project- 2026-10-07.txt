@@ -1,0 +1,2121 @@
+------------ UPDATE STATE PROJECT - 07.10.2026 ---------------
+Project LUDUS
+Super Mario Strikers native PC port
+
+This section is the current 07.10.2026 delta.
+The complete 30.09.2026 state document is preserved below as a historical snapshot.
+
+
+============================================================
+Current strategic state — 07.10.2026
+============================================================
+
+The active frontier has moved beyond the 30.09 TitleScene milestone.
+
+Current gameplay-transition truth:
+
+  Front-end / menu flow
+      ↓
+  Stadium Select
+      ↓
+  SuperLoading
+      ↓
+  TransitionTask reaches task state 2
+      ↓
+  gameplay bootstrap is still incomplete
+      ↓
+  current blue endpoint
+
+Important:
+
+  The current blue endpoint is no longer the old
+  "unsupported Intro Movie" frontier documented on 30.09.
+
+  The project now reaches the gameplay transition frontier.
+
+  The missing piece is the real state-2 gameplay lifecycle:
+    TransitionTask::StateTransition(..., to == 2)
+      -> InitializeGameState()
+      -> CreateGame()
+      -> remaining gameplay/world initialization
+
+Do NOT add a fake state-2 path merely to remove the blue screen.
+
+The current strategy is to promote the real retail gameplay prerequisites
+incrementally and validate each one before wiring the complete transition.
+
+
+============================================================
+TransitionTask state 2 — retail audit
+============================================================
+
+Retail state-2 transition includes:
+
+  UpdateMonkeyState(0)
+
+  if coming from FE state 4:
+    DestroyFEState()
+
+  if g_pGame == NULL:
+    InitializeGameState()
+    AudioLoader::InitCrowdFromStateTransition()
+    ReplayManager::Instance()->ResetSnapshots()
+
+  if coming from a state other than 1:
+    ReplayManager::Instance()->PrepareForRecording()
+
+The PC TransitionTask still intentionally does NOT contain the full
+to == 2 branch.
+
+Reason:
+
+  InitializeGameState() opens a very large gameplay dependency closure.
+
+The correct path remains:
+
+  audit
+    ↓
+  isolate
+    ↓
+  compile
+    ↓
+  runtime-test
+    ↓
+  promote
+    ↓
+  only then connect the full gameplay transition
+
+
+============================================================
+InitializeGameState / CreateGame frontier
+============================================================
+
+InitializeGameState() was audited and confirmed to be broad.
+
+It reaches, among other systems:
+
+  GameInfo pregame setup
+  Replay initialization
+  resource mark / lighting
+  event handlers
+  StatsTracker
+  Jumbotron / Crowd
+  CreateGame()
+  TerrainInitialize
+  Graphics / FE / World / Audio / Physics / NPC / AI / Camera loaders
+  in-game audio / crowd / script events
+  snapshots
+  localization / fonts
+  FE resources / scenes / overlays / loading out
+  rumble / audio stream / electric fence / time regions
+
+Decision:
+
+  Do NOT port InitializeGameState() as one monolithic PC step.
+
+The narrower active path is the real retail CreateGame() dependency chain.
+
+
+============================================================
+Retail CreateGame() — audited order
+============================================================
+
+Retail ordering:
+
+  g_pGame =
+    new (nlMalloc(sizeof(cGame), 8, false)) cGame()
+
+  g_pTeams[0] =
+    new (nlMalloc(sizeof(cTeam), 8, false)) cTeam(0)
+
+  g_pTeams[1] =
+    new (nlMalloc(sizeof(cTeam), 8, false)) cTeam(1)
+
+  cField::Init(
+    g_pTeams[0]->m_pNet,
+    g_pTeams[1]->m_pNet
+  )
+
+  FormationManager::LoadFormationSets()
+
+  create AISandbox singleton if absent
+
+  create ScriptQuestionCache singleton if absent
+
+  apply game-duration / difficulty setup
+
+DestroyGame() correspondingly tears down:
+
+  ScriptQuestionCache
+  AISandbox
+  both cTeam instances
+  cGame
+  formation sets
+
+
+============================================================
+Gameplay Tweaks runtime
+============================================================
+
+[DONE] PC gameplay tweaks startup/runtime slice promoted.
+
+Important commit:
+
+  a22c29fd  Promote PC gameplay tweaks runtime
+
+Focused Tweaks runtime validation was established before the Game core slice.
+
+
+============================================================
+Game core runtime — CLOSED
+============================================================
+
+[DONE] real PC game core startup runtime promoted.
+
+Commit:
+
+  74595832  Promote PC game core runtime
+
+Promoted core includes:
+
+  src/Game/Game.cpp
+  src/NL/nlTimer.cpp
+  pc/Game/Camera/CameraStatics_pc.cpp
+  pc/tests/pcgame_core_test.cpp
+
+PC startup isolation:
+
+  SMSTRIKERS_PC_GAME_STARTUP_ONLY=1
+
+The narrow runtime keeps the real cGame startup behavior while excluding the
+broad gameplay body that is not yet ready for native production ownership.
+
+Focused runtime validation:
+
+  PC Game core runtime: PASS
+  exit=0
+
+Main smstrikers_pc build also passed after this slice.
+
+This establishes the first CreateGame() object:
+
+  cGame  [PROMOTED + TESTED]
+
+
+============================================================
+Team / Net / Formation startup runtime — ACTIVE 07.10
+============================================================
+
+The next CreateGame() prerequisite was the pair of real cTeam objects.
+
+Audited retail constructor behavior:
+
+  cTeam::cTeam(int nSide)
+
+    initializes team state
+
+    clears:
+      m_pPlayers[5]
+      m_pAIOrderedFielders[4]
+      m_pBallInterceptOrderedFielders[4]
+
+    creates:
+      cNet
+      FormationManager
+
+using the real NL allocator / placement-new path.
+
+The PC startup slice now contains:
+
+  src/Game/Team.cpp
+  src/Game/Formation.cpp
+  src/Game/Net.cpp
+
+under:
+
+  SMSTRIKERS_PC_TEAM_STARTUP_ONLY=1
+
+
+Team.cpp startup slice keeps:
+
+  g_pTeams[2]
+  g_pCurrentlyUpdatingTeam
+  cTeam::cTeam(int)
+  cTeam::~cTeam()
+
+and excludes the broad gameplay methods.
+
+
+Net.cpp startup slice keeps:
+
+  static net dimensions
+  cNet::cNet(int)
+  cNet::~cNet()
+
+and excludes broader field/net behavior.
+
+
+Formation.cpp startup slice keeps:
+
+  FormationManager::m_NumFormationSets
+  FormationManager::m_FormationSetArray
+  FormationManager constructor
+  FormationManager destructor
+
+A startup-only ClearFormationEvals() helper is provided so the real destructor
+can remain available without pulling the broad formation implementation.
+
+
+============================================================
+Team compile / runtime validation
+============================================================
+
+Initial isolated compile probe:
+
+  smstrikers_pcteam_compile_probe
+
+Sources:
+
+  src/Game/Team.cpp
+  src/Game/Formation.cpp
+  src/Game/Net.cpp
+
+Compile result:
+
+  PASS
+  exit=0
+
+Only the already-known MSVC warnings for unsupported cpp_extensions pragmas
+were emitted.
+
+
+Focused runtime test added:
+
+  pc/tests/pcteam_test.cpp
+
+The test performs:
+
+  nlInitMemory()
+
+  allocate two cTeam objects through nlMalloc
+
+  placement-construct the real cTeam constructors
+
+  validate:
+    team side
+    score / powerup startup defaults
+    player pointer initialization
+    AI pointer initialization
+    cNet allocation and startup state
+    FormationManager allocation
+    FormationManager owner pointer
+    null formation evaluators
+    invalid startup formation caches
+
+  delete both teams
+
+  verify StandardAllocator free memory returns to its original total
+
+
+Required test dependencies discovered during audit:
+
+  NL/MemAlloc.h
+    -> declaration of StandardAllocator
+
+  src/NL/nlTimer.cpp
+    -> Timer::SetSeconds(float)
+
+The Timer dependency is linked directly into the focused test rather than
+dragging the complete Game core runtime into it.
+
+
+Runtime result before promotion:
+
+  PC Team runtime: PASS
+  exit=0
+
+
+============================================================
+Team runtime promotion — current working-tree checkpoint
+============================================================
+
+The compile probe has now been promoted in the working tree to:
+
+  smstrikers_pcteam_runtime
+
+with:
+
+  src/Game/Team.cpp
+  src/Game/Formation.cpp
+  src/Game/Net.cpp
+
+and compile definitions:
+
+  SMSTRIKERS_PC=1
+  TARGET_PC=1
+  dSINGLE=1
+  SMSTRIKERS_PC_TEAM_STARTUP_ONLY=1
+
+The runtime is attached to the production target:
+
+  smstrikers_pc
+
+The focused test now consumes:
+
+  smstrikers_pcteam_runtime
+  smstrikers_pcmemory_runtime
+
+Post-promotion build result:
+
+  smstrikers_pcteam_runtime.lib
+    PASS
+
+  smstrikers_pcteam_test.exe link
+    PASS
+
+  exit=0
+
+
+IMPORTANT unfinished validation at handoff:
+
+  The runtime test passed before promotion.
+
+  After promotion, the test executable was rebuilt and linked successfully,
+  but the final post-promotion execution has NOT yet been rerun.
+
+Therefore the first next action is:
+
+  run:
+    build-pc\Debug\smstrikers_pcteam_test.exe
+
+  expect:
+    PC Team runtime: PASS
+    exit=0
+
+Then:
+
+  build main smstrikers_pc
+
+  inspect diff/status
+
+  selectively stage the Team slice
+
+  inspect cached diff
+
+  commit
+
+
+============================================================
+EOL audit lesson — Team slice
+============================================================
+
+Native file state discovered during this slice:
+
+  src/Game/Team.cpp
+    LF
+
+  src/Game/Formation.cpp
+    LF
+
+  src/Game/Net.cpp
+    LF
+
+  CMakeLists.txt
+    predominantly CRLF
+
+The first generated patch used CRLF everywhere and GNU patch correctly
+rejected the source hunks with:
+
+  different line endings
+
+The patch was regenerated with:
+
+  LF source hunks
+  CRLF CMake hunk
+
+Strict GNU patch dry-run then passed with:
+
+  --binary
+  --fuzz=0
+
+and applied cleanly.
+
+Policy remains:
+
+  DO NOT normalize EOL.
+
+  Preserve the native line-ending behavior of each file.
+
+
+============================================================
+Current intended Team commit
+============================================================
+
+Intended files:
+
+  CMakeLists.txt
+  src/Game/Team.cpp
+  src/Game/Formation.cpp
+  src/Game/Net.cpp
+  pc/tests/pcteam_test.cpp
+
+Potential commit title:
+
+  Promote PC team startup runtime
+
+Do not commit until:
+
+  1. post-promotion smstrikers_pcteam_test runtime PASS
+  2. main smstrikers_pc build PASS
+  3. staged diff contains only intended Team changes
+
+
+============================================================
+Foreign working-tree changes — still do NOT stage wholesale
+============================================================
+
+CMakeLists.txt contains a known foreign hunk:
+
+  smstrikers_pctransition_task_boot_runtime
+    + src/Game/SH/SHLoading.cpp
+
+That hunk is unrelated to the Team slice.
+
+Therefore:
+
+  DO NOT git add CMakeLists.txt wholesale.
+
+Use the selective-index strategy already used for the previous Game core
+commit so the Team CMake changes can be staged while the foreign SHLoading
+hunk remains unstaged.
+
+Known foreign/local work also includes:
+
+  pc/Game/Audio/AudioLoaderStorage_pc.cpp
+  pc/Game/FE/FEMusic_pc.cpp
+  pc/Game/FE/feHelpFuncs_pc.cpp
+  pc/Game/GameInfo_pc.cpp
+  pc/Game/PCTransitionTask.cpp
+  src/Game/SH/SHLoading.cpp
+
+plus retained local logs/assets/helpers/zip/progress-document noise.
+
+These are not part of the Team commit unless explicitly audited and selected.
+
+
+============================================================
+Next CreateGame() step
+============================================================
+
+After the Team slice is committed, resume CreateGame() at the next exact
+retail call:
+
+  cField::Init(
+    g_pTeams[0]->m_pNet,
+    g_pTeams[1]->m_pNet
+  )
+
+This is now the preferred next audit because it directly consumes the two
+real cNet objects that have just been promoted.
+
+Audit:
+
+  cField static/global storage
+  exact cField::Init implementation
+  dependencies reached by Init
+  whether a narrow startup-only boundary is viable
+  focused runtime state that can be validated without pulling broad
+  gameplay/render/physics systems
+
+Then continue in retail order:
+
+  1. cField::Init()
+  2. FormationManager::LoadFormationSets()
+  3. AISandbox singleton
+  4. ScriptQuestionCache singleton
+  5. game-duration / difficulty selection
+  6. narrow real CreateGame() assembly
+  7. only then return to broader InitializeGameState()
+  8. only then wire TransitionTask state 2
+
+
+============================================================
+Current gameplay-core mental model
+============================================================
+
+  FE / menu path
+      ↓
+  Stadium Select
+      ↓
+  SuperLoading
+      ↓
+  TransitionTask state 2
+      ↓
+  InitializeGameState()
+      ↓
+  CreateGame()
+      ↓
+  cGame
+      [PROMOTED + TESTED]
+      ↓
+  cTeam x2
+      [PROMOTED IN WORKTREE;
+       TEST BUILD PASS;
+       FINAL POST-PROMOTION RUN + COMMIT PENDING]
+      ↓
+    cNet
+      [inside Team runtime]
+    FormationManager
+      [inside Team runtime]
+      ↓
+  cField::Init()
+      [NEXT]
+      ↓
+  FormationManager::LoadFormationSets()
+      ↓
+  AISandbox
+      ↓
+  ScriptQuestionCache
+      ↓
+  difficulty / game-duration setup
+      ↓
+  remaining gameplay initialization
+
+
+============================================================
+Repository checkpoint — 07.10.2026
+============================================================
+
+Branch:
+
+  pc-port
+
+Last committed gameplay-core checkpoint:
+
+  74595832  Promote PC game core runtime
+
+Immediately preceding relevant gameplay checkpoint:
+
+  a22c29fd  Promote PC gameplay tweaks runtime
+
+Current Team slice:
+
+  promoted in working tree
+  not yet committed at this handoff
+
+Current validation status:
+
+  [PASS] PC Game core runtime
+  [PASS] Team compile probe
+  [PASS] Team focused runtime before promotion
+  [PASS] promoted Team runtime build
+  [PASS] promoted Team test executable link
+  [PENDING] final promoted Team runtime execution
+  [PENDING] main smstrikers_pc build after Team promotion
+  [PENDING] selective stage / cached diff / Team commit
+
+
+============================================================
+Progress interpretation — 07.10.2026
+============================================================
+
+The most important change since the 30.09 document is architectural:
+
+  On 30.09 the immediate frontier was still TitleScene / Intro Movie bypass.
+
+  By 07.10 the active frontier is the actual gameplay transition into
+  task state 2 and the real retail CreateGame() dependency chain.
+
+This is a substantial movement toward Roma Victrix, but:
+
+  no playable match exists yet;
+
+  no full gameplay/world state has been initialized yet;
+
+  the state-2 TransitionTask branch is still intentionally incomplete.
+
+No fresh global percentage recalculation is recorded in this update.
+
+The rough percentages in the preserved 30.09 snapshot below should therefore
+be read as historical estimates, not as a newly measured 07.10 score.
+
+
+============================================================
+Exact next handoff action
+============================================================
+
+Run only:
+
+  Set-Location 'C:\msys64\home\epsxPC\smstrikers-decomp'; $lines = & '.\build-pc\Debug\smstrikers_pcteam_test.exe' 2>&1; $code=$LASTEXITCODE; $out=@($lines | ForEach-Object { "$_" }); $out+="exit=$code"; $out | Set-Clipboard; $out
+
+Expected:
+
+  PC Team runtime: PASS
+  exit=0
+
+After the Team slice is validated and committed:
+
+  begin cField::Init() audit.
+
+
+======================================================================
+======================================================================
+HISTORICAL SNAPSHOT — ORIGINAL STATE DOCUMENT FROM 30.09.2026
+======================================================================
+======================================================================
+
+------------ UPDATE STATE PROJECT - 30.09.2026 ---------------
+Project LUDUS
+Super Mario Strikers native PC port
+
+Campaigns / milestones:
+  Pax Matrixa      → matrix subsystem
+  Aquila Surgit    → renderer + retail startup bring-up
+  Rubicon LXIV     → BMD / 32-bit → x64 conversion
+  Prima Lux        → first real rendered game frame
+  Roma Victrix     → first playable in-game scene / match
+  Triumphus        → major native-PC milestone
+
+
+Project LUDUS — Current Campaign: Aquila Surgit
+
+
+Project LUDUS — rough progress
+
+Infrastructure / platform foundation   ████████████████████  ~98–99%
+Pax Matrixa                            ████████████████████  100%
+Aquila Surgit                          ████████████████████  ~98%
+Rubicon LXIV                           ███████████░░░░░░░░░  ~55–60%
+Prima Lux                              ████████████████████  ACHIEVED on the FE path
+Roma Victrix                           ██████░░░░░░░░░░░░░░  ~30%
+Triumphus / final polished port        ███████░░░░░░░░░░░░░  ~35%
+
+Prima Lux note:
+  The native PC build now renders authentic retail FE content
+  (Health Warning and Legal/CrossFader screens).
+
+  This satisfies the literal "first real rendered game frame" milestone.
+  It does NOT mean gameplay / 3D match rendering is complete.
+
+
+============================================================
+Renderer / platform startup
+============================================================
+
+  [DONE] Aurora native window / WebGPU / D3D12
+  [DONE] PC memory runtime
+  [DONE] PC filesystem runtime
+  [DONE] matrix subsystem / Pax Matrixa
+  [DONE] GL / GLX startup foundation
+  [DONE] GL target startup
+  [DONE] GL view startup
+  [DONE] GL font startup
+  [DONE] GL constant startup
+  [DONE] global.glt loading
+  [DONE] 46/46 global textures decoded and registered
+  [DONE] PC startup smoke path stable from retail working directory
+  [DONE] clean Alt+F4 shutdown / exit=0
+  [DONE] PC target FPS query available (60 Hz)
+
+  [DONE] PC GL user-data runtime
+  [DONE] PC model runtime ABI foundation
+  [DONE] PC GL mesh-writer runtime
+  [DONE] ShapeRenderer startup integrated
+  [DONE] DepthOfFieldManager startup integrated
+  [DONE] FlareHandler startup integrated
+  [DONE] glApp startup core integrated
+  [DONE] BeginFrame skinning startup configuration integrated
+  [DONE] SetupViews integrated at the retail startup position
+  [DONE] production smoke remains stable after SetupViews integration
+
+  [DONE] PC texture-existence shim for startup:
+         pc/NL/gl/glTexture_pc.cpp
+         glTextureLoad(handle)
+           → smstrikers_pc_glx_find_texture(handle) != NULL
+
+  Important:
+    The PC shim intentionally implements only glTextureLoad() for the
+    currently required startup semantics.
+
+    It does NOT invent premature PC implementations for:
+      glTextureReplace()
+      glTextureGetNumBits()
+      glTextureGetHeight()
+      glTextureGetWidth()
+
+    Those retail wrappers depend on glplatTexture* behavior that is still
+    excluded on TARGET_PC and should be ported only when their real runtime
+    users enter the production closure.
+
+  [KNOWN] PC file opens are currently relative to process working directory.
+          PCFile::Open() uses std::fopen(filename, "rb") directly
+          and nlInitFileSystem() does not establish an asset root.
+
+  [KNOWN] therefore smstrikers_pc.exe must currently be launched from:
+          orig\G4QE01\files
+
+  [TODO] eventual PC asset-root / packaging policy independent of CWD
+  [TODO] actual GC texture payload upload/conversion to WebGPU
+  [TODO] real model/material/resource flow into the native renderer
+
+
+============================================================
+Retail startup sequence
+============================================================
+
+Core platform/startup:
+
+  [DONE] Config runtime x64 compatibility
+  [DONE] common.ini loading
+  [DONE] platform.ini / locale.ini / user.ini handling
+
+  [DONE] UserOptions startup core
+  [DONE] localization startup
+  [DONE] language startup
+  [DONE] PC NL random-state seeding
+
+  [DONE] EventManager runtime
+  [DONE] EventManager::Create(128, 64)
+
+  [DONE] nlTaskManager runtime
+  [DONE] nlTaskManager::Startup(0x10000)
+  [DONE] nlTaskManager task dispatch runtime validated
+  [DONE] nlTaskManager state-transition callback/commit semantics validated
+  [DONE] retail initial pending state restored on PC:
+         skipfe ? 2 : 4
+
+  [DONE] retail SimpleParser PC compatibility
+  [DONE] retail tDebugPrintManager runtime
+  [DONE] PrintCfg.txt parsing validation
+  [DONE] tDebugPrintManager::Initialize() integrated
+
+  [DONE] ClockManager::Initialize() integrated
+
+  [DONE] FE audio lookup startup validation integrated
+  [DONE] FEStreamConfig startup validation integrated
+  [DONE] platform audio startup validation integrated
+
+  [DONE] glResourceMark()
+  [DONE] glInventory.Create()
+
+  [DONE] InitPads()
+  [DONE] AIPadManager::Startup()
+  [DONE] FEInput::Initialize()
+  [DONE] FlickDetection::Initialize()
+
+Task integration:
+
+  [DONE] PC input update task registered with nlTaskManager
+  [DONE] first real PC nlTaskManager::RunAllTasks() path active in frame loop
+
+  [DONE] PlatPadUpdateTask integrated + tested at retail priority 3
+  [DONE] ClockUpdateTask integrated + tested at retail priority 5
+  [DONE] LoadingManager integrated + tested at retail priority 6
+  [DONE] ComUpdateTask integrated + tested at retail priority 16
+  [DONE] DispatchEventsTask integrated + tested at retail priority 20
+
+  [AUDITED] WorldUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] ParticleUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] TweakerTask focused runtime validated; production integration deferred
+  [AUDITED] AudioUpdateTask focused runtime validated; production integration deferred
+  [AUDITED] EndFrameTask focused runtime validated; production integration deferred
+  [AUDITED] GameRenderTask audited only; no full production runtime; deferred
+
+  [PARTIAL / ACTIVE] TransitionTask PC boot lifecycle
+      - transition attach runtime exists
+      - FE boot transition path is active
+      - Health -> Legal transition is functional
+      - full gameplay/world transition ownership is NOT complete
+
+  [PARTIAL / ACTIVE] FrontEnd runtime
+      - PC FrontEnd boot runtime is promoted into production
+      - FE package/resource/scene path is active for current bootstrap
+      - full FE/game/menu closure is still incomplete
+
+  [DEFERRED] ResetTask
+  [DEFERRED] full retail BeginFrameTask
+  [DEFERRED] FixedUpdateTask
+  [DEFERRED] TestTask
+
+Additional retail startup tail connected:
+
+  [DONE] memory-card icon startup
+  [DONE] GameInfoManager startup
+  [DONE] StatsTracker startup
+  [DONE] AddTasks() selective PC task registration path
+  [DONE] SetupViews()
+  [DONE] ShapeRenderer::Initialize()
+  [DEFERRED] Wiper::Initialize()
+  [DONE] DepthOfFieldManager::Initialize()
+  [DONE] FlareHandler::Initialize()
+  [DONE] glAppStartup()
+
+Wiper remains intentionally deferred.
+
+Reason:
+  Wiper opens the larger model/resource closure:
+    .glt
+    .fx
+    .glg
+    .sanim
+    .shier
+
+  That dependency frontier should still be addressed deliberately rather than
+  pulled into startup through stubs or incomplete resource behavior.
+
+============================================================
+Front-end / FE scene bring-up — UPDATED 30.09.2026
+============================================================
+
+Major change since the 18.09 checkpoint:
+
+  The project is no longer visually limited to a blue framebuffer.
+
+  Authentic retail FE content now renders on the native PC path.
+
+Validated FE package materialization:
+
+  [DONE] art/fe/health_and_safety.fen
+  [DONE] art/fe/englegal.fen
+  [DONE] art/fe/start_screen_v2.fen
+
+Health Warning:
+
+  [DONE] Health Warning FE package native materialization
+  [DONE] Health Warning scene rendered through the real FE runtime
+  [DONE] production runtime reaches visible Health Warning
+  [DONE] keyboard input can advance the scene
+
+Legal / CrossFader:
+
+  [DONE] PC TransitionTask path handles Health -> Legal transition
+  [DONE] minimal DestroyFEFast() / InitializeFEState() bootstrap is active
+  [DONE] Legal scene package materializes
+  [DONE] SHCrossFader x64/PC compatibility work integrated
+  [DONE] Nintendo legal screen / logo is visible
+  [DONE] NLG legal screen / logo is visible
+
+Current end of that runtime path:
+
+  Legal/CrossFader
+      ↓
+  SCENE_INTRO_MOVIE
+      ↓
+  unsupported PC movie scene
+      ↓
+  blue framebuffer
+
+This is expected at the current frontier.
+
+Intro Movie:
+
+  [DEFERRED] THP/movie playback
+
+  Retail IntroMovieScene uses:
+    intromovie.thp
+
+  The current PC port does not yet implement the GameCube THP/movie stack.
+
+  Decision:
+    do NOT pull THP playback into the Title bring-up milestone.
+
+Title package foundation:
+
+  [DONE] start_screen_v2.fen wire format audited
+  [DONE] x64-native FE package materializer implemented
+  [DONE] nested Component / Component2 topology reconstructed
+  [DONE] title texture-resource ring reconstructed
+  [DONE] title FEText / TLTextInstance topology reconstructed
+  [DONE] title font resource reconstructed
+
+  Title package facts:
+
+    file:
+      art/fe/start_screen_v2.fen
+
+    unique ID:
+      0x87654321
+
+    resources:
+      6
+
+    top layer:
+      Layer2
+
+    nested logo component:
+      Component
+        -> Slide1
+        -> BIG-STAR_CENTERED
+
+    nested press-start component:
+      Component2
+        -> Slide1
+        -> Text
+
+    title font hash:
+      0x356BE642
+
+  That font hash resolves to the already-loaded heading font:
+    cepoitalic24
+
+FEFontResource x64 foundation:
+
+  [DONE] TARGET_PC FEFontResource participates in FEResourceHandle
+  [DONE] TLTextInstance PC font access uses semantic FEFontResource
+  [DONE] resource-ring participation is now safe on x64
+
+Focused FE native test:
+
+  smstrikers_pcfenative_test.exe
+
+  output:
+
+    PASS: FE health package native materialization
+          (resources=2 animations=2)
+
+    PASS: FE title package native materialization
+          (resources=6 nested-components=2 text=1)
+
+    exit=0
+
+Important current distinction:
+
+  Title PACKAGE materialization is complete and validated.
+
+  Title SCENE integration is NOT complete yet.
+
+  The next milestone is to add the minimal PC TitleScene runtime,
+  wire SCENE_TITLE into the scene manager, and temporarily bypass the
+  unsupported Intro Movie so the retail FE path can reach Title.
+
+Keyboard bootstrap currently used for FE bring-up:
+
+  X      -> A
+  C      -> B
+  Z      -> X
+  V      -> Y
+  Enter  -> START
+  Space  -> Z
+  arrows -> D-pad
+
+============================================================
+SetupViews integration — CLOSED 18.09.2026
+============================================================
+
+Retail ordering:
+
+  AddTasks();
+
+  SetupViews();
+  g_ShapeRenderer.Initialize();
+  Wiper::Instance().Initialize();
+  DepthOfFieldManager::instance.Initialize();
+  FlareHandler::instance.Initialize();
+  glAppStartup();
+
+
+PC ordering now preserves the important retail relationship:
+
+  AddTasks / task registration
+      ↓
+  smstrikers_pc_setup_views()
+      ↓
+  g_ShapeRenderer.Initialize()
+      ↓
+  [Wiper deferred]
+      ↓
+  DepthOfFieldManager::instance.Initialize()
+      ↓
+  FlareHandler::instance.Initialize()
+      ↓
+  glAppStartup()
+
+
+SetupViews behavior mirrored on PC:
+
+  [DONE] all GL views target GLTG_Main
+
+  [DONE] GLV_FrontEnd sort:
+         GLVSort_TransformedDepth
+
+  [DONE] GLV_Anark sort:
+         GLVSort_Reverse
+
+  [DONE] exact retail sort-none list:
+         GLV_Shadow0
+         GLV_Shadow1
+         GLV_UnsortedPerspective
+         GLV_InvisiblePlane
+         GLV_ElectricFence
+         GLV_UnsortedOrtho
+         GLV_ShadowBlend0
+         GLV_ShadowBlend1
+         GLV_Debug
+         GLV_Transitions
+         GLV_CoPlanar0
+         GLV_CoPlanar
+
+  [DONE] exact retail disabled-view list:
+         GLV_ShadowBlend0
+         GLV_ShadowBlend1
+         GLV_ScreenBlur
+         GLV_ScreenBlur2
+
+  [DONE] target/warble texture existence probe
+
+  [DONE] if warble texture is absent:
+         GLV_Warble disabled
+         GLV_WarbleBlend disabled
+
+  [DONE] exact retail depth-clear list:
+         GLV_CameraSpace
+         GLV_Transitions
+         GLV_Transitions3D
+         GLV_Anark3D_BG
+         GLV_Anark3D_FG
+
+  [DONE] ParticleSystem::ClearViews()
+  [DONE] ParticleSystem::AddView(GLV_Particles)
+
+  [DONE] real retail static preserved:
+         ModeledScreenTransition::s_3DView
+
+  [DONE] final transition view:
+         GLV_Transitions3D
+
+
+PC storage strategy:
+
+  ParticleSystem:
+    real retail statics preserved:
+      eGLView ParticleSystem::m_eViews[8]
+      int ParticleSystem::m_nNumViews
+
+    exact startup methods supplied:
+      ParticleSystem::ClearViews()
+      ParticleSystem::AddView()
+
+  ModeledScreenTransition:
+    real static preserved:
+      ModeledScreenTransition::s_3DView
+
+    ModelTransition.h is compiled only in the isolated PC storage TU with:
+      /Zc:twoPhase-
+
+    This avoids changing retail headers merely to satisfy normal MSVC
+    two-phase template parsing.
+
+
+Focused SetupViews validation:
+
+  build:
+    smstrikers_pcsetupviews_test.exe
+    exit=0
+
+  runtime:
+    PC SetupViews: PASS
+    exit=0
+
+  Test verifies:
+    - all 34 targets = GLTG_Main
+    - exact sort modes
+    - exact disabled views
+    - target/warble name + handle path
+    - exact depth-clear views
+    - ParticleSystem::m_nNumViews == 1
+    - ParticleSystem::m_eViews[0] == GLV_Particles
+    - ModeledScreenTransition::s_3DView == GLV_Transitions3D
+
+Production validation after SetupViews:
+
+  [PASS] Release smstrikers_pc build
+  [PASS] smstrikers_pc.exe link
+  [PASS] runtime smoke from orig\G4QE01\files
+  [PASS] stable blue framebuffer
+  [PASS] no SetupViews startup crash/assert/error
+  [PASS] clean shutdown
+  [PASS] exit=0
+  [PASS] git diff --check
+  [PASS] git diff --cached --check
+
+
+============================================================
+PC input / pad bring-up
+============================================================
+
+  [DONE] Aurora PAD backend linked into smstrikers_pc
+  [DONE] PC PADStatus layout matched to Aurora ABI
+         TARGET_PC PADStatus includes extButton
+
+  [DONE] platpad.cpp portability for MSVC/x64
+         PPC-only deadzone asm replaced by PC C++ path
+         __cntlzw replaced by std::countl_zero on TARGET_PC
+
+  [DONE] globalpad.cpp + platpad.cpp compiled in smstrikers_pcinput_runtime
+  [DONE] PadActions.cpp + PadMonkey.cpp compiled in smstrikers_pcinput_runtime
+
+  [DONE] PC-safe cPlatPad allocation uses sizeof(cPlatPad)
+  [DONE] PC-safe PadMonkey allocation uses sizeof(PadMonkey)
+
+  [DONE] retail GameCube allocation literals preserved under non-PC builds
+
+  [DONE] glx_GetTargetFPS() PC implementation returns 60
+
+  [DONE] InitPads() linked into the real PC startup bridge
+  [DONE] AIPadManager::Startup() linked after InitPads()
+  [DONE] FEInput::Initialize() linked after AIPadManager startup
+  [DONE] FlickDetection::Initialize() linked into PC startup
+
+  [DONE] glplat prestartup test include-path regression fixed
+  [DONE] native PC frame-loop polling decision established
+
+  [DONE] smstrikers_pc_pad_update() now performs:
+         VBlankPadUpdate()
+         nlTaskManager::RunAllTasks()
+
+  [DONE] PCInputUpdateTask runs through nlTaskManager
+  [DONE] PCInputUpdateTask runtime behavior validated
+  [DONE] task dispatch runtime validated
+  [DONE] input task remains active across the initial state transition
+
+
+PCInputUpdateTask current body:
+
+  UseDefaultPad()
+  UpdatePlatPad(dt)
+  cPadManager::Update(dt)
+  FlickDetection::Update()
+
+
+PCInputUpdateTask registration:
+
+  priority      7
+  statesActive -1
+
+
+Current PC frame path:
+
+  aurora_begin_frame
+      ↓
+  smstrikers_pc_pad_update()
+      ↓
+  VBlankPadUpdate()
+      ↓
+  nlTaskManager::RunAllTasks()
+      ↓
+  PCInputUpdateTask
+      ↓
+  draw()
+      ↓
+  aurora_end_frame
+
+
+x64 layout audit:
+
+  sizeof(cGlobalPad) = 32
+  sizeof(cPlatPad)   = 32
+  sizeof(PadMonkey)  = 232
+
+
+Important:
+
+  Retail hard-coded allocation sizes were:
+    cPlatPad   0x1C
+    PadMonkey  0xD8
+
+  Those are too small for the MSVC x64 layouts.
+
+  TARGET_PC therefore allocates with sizeof(...), while GameCube keeps
+  the original retail constants.
+
+
+Retail PAD callback model:
+
+  SISetSamplingRate(0)
+  PADSetSamplingCallback(VBlankPadUpdate)
+
+
+Current PC decision:
+
+  Aurora does not expose the exact retail SISetSamplingRate /
+  PADSetSamplingCallback model.
+
+  The PC port therefore does not fake those APIs.
+
+  VBlankPadUpdate() is called explicitly once per native frame before
+  nlTaskManager::RunAllTasks().
+
+
+Controller validation:
+
+  Real end-to-end physical controller validation is still pending.
+  A PS4 controller will be connected when that stage is reached.
+
+
+============================================================
+Retail task graph — audited reference
+============================================================
+
+  Reset             priority 0    states -1
+  Transition        priority 1    states -1
+  BeginFrame        priority 2    states -1
+  PlatPadUpdate     priority 3    states -1
+  ClockUpdate       priority 5    states -1
+  LoadingManager    priority 6    states -1
+  FixedUpdate       priority 7    states -1
+  WorldUpdate       priority 8    states 0x20013
+  GameRender        priority 10   states 0x20113
+  ParticleUpdate    priority 11   states 0x20113
+  FrontEnd          priority 12   states 0x117
+  Tweaker           priority 13   states -1
+  AudioUpdate       priority 14   states -1
+  EndFrame          priority 15   states -1
+  ComUpdate         priority 16   states -1 optional
+  TestTask          priority 18   states -1 optional
+  DispatchEvents    priority 20   states -1
+
+
+Retail main loop:
+
+  for (;;)
+  {
+      nlTaskManager::RunAllTasks();
+      UpdateProfile();
+  }
+
+
+Current restoration policy:
+
+  Restore the retail task graph incrementally.
+
+  Do not enable large gameplay/world tasks simply because they compile.
+
+  Each task gets:
+    - dependency audit
+    - focused validation
+    - PC runtime smoke
+    - GameCube baseline check
+
+
+============================================================
+Current task frontier — audited retail task graph
+============================================================
+
+Current task ledger:
+
+  Reset             priority 0    states -1       [DEFERRED]
+
+  Transition        priority 1    states -1       [PARTIAL / ACTIVE]
+      PC boot transition runtime is integrated far enough for:
+        - FE attach
+        - Health -> Legal lifecycle
+        - FE teardown/reinitialization used by current bootstrap
+
+      Still incomplete:
+        - full gameplay/world transition lifecycle
+        - all retail transition destinations
+
+  BeginFrame        priority 2    states -1       [DEFERRED - full retail task]
+      startup-side skinning configuration is integrated,
+      but full retail task ownership is still not restored.
+
+  PlatPadUpdate     priority 3    states -1       [DONE] integrated + tested
+  ClockUpdate       priority 5    states -1       [DONE] integrated + tested
+  LoadingManager    priority 6    states -1       [DONE] integrated + tested
+  FixedUpdate       priority 7    states -1       [DEFERRED]
+
+  WorldUpdate       priority 8    states 0x20013  [AUDITED]
+      focused runtime validated; production integration deferred.
+
+  GameRender        priority 10   states 0x20113  [AUDITED]
+      no full production wrapper/runtime; deferred.
+
+  ParticleUpdate    priority 11   states 0x20113  [AUDITED]
+      focused runtime validated; production integration deferred.
+
+  FrontEnd          priority 12   states 0x117    [PARTIAL / ACTIVE]
+      PC FrontEnd boot runtime is active for current FE bootstrap.
+      Full menu/game FE closure is not yet complete.
+
+  Tweaker           priority 13   states -1       [AUDITED]
+      focused runtime validated; deferred.
+
+  AudioUpdate       priority 14   states -1       [AUDITED]
+      focused runtime validated; full audio lifecycle deferred.
+
+  EndFrame          priority 15   states -1       [AUDITED]
+      focused runtime validated; Aurora still owns the native frame boundary.
+
+  ComUpdate         priority 16   states -1       [DONE] integrated + tested
+  TestTask          priority 18   states -1       [DEFERRED / optional]
+  DispatchEvents    priority 20   states -1       [DONE] integrated + tested
+
+
+Focused validation commits:
+
+  14221738  Validate PC world update task runtime
+  915e9c71  Validate PC particle update task runtime
+  011d5f9d  Validate PC front-end task runtime
+  44a0141b  Validate PC tweaker task runtime
+  2aa086bf  Validate PC audio update task runtime
+  91df0729  Validate PC end-frame task runtime
+
+
+Integrated task / FE boot commits relevant to the current frontier:
+
+  7fc38ffc  Integrate PC dispatch events task runtime
+  623296b3  Integrate PC PlatPad update task runtime
+  cdae6f31  Integrate PC Com update task runtime
+
+  9eab20b   Add PC transition attach runtime
+  4a522228  Promote PC FrontEnd boot runtime
+
+
+Architectural conclusion — updated 30.09:
+
+  The FE lifecycle is no longer purely theoretical / deferred.
+
+  A real subset is now active in production and renders retail FE scenes.
+
+  The important remaining distinction is:
+
+    FE bootstrap / scene runtime
+      -> now active
+
+    full gameplay/world lifecycle
+      -> still incomplete
+
+  Therefore WorldUpdate / FixedUpdate should STILL NOT be forced into
+  production merely because the FE path has advanced.
+
+
+Render/frame ownership remains a separate frontier:
+
+  Aurora currently owns:
+    aurora_begin_frame()
+    ...
+    aurora_end_frame()
+
+  Retail expects:
+    BeginFrameTask
+    GameRenderTask
+    ParticleUpdateTask
+    EndFrameTask
+
+  This still needs an explicit ownership/reconciliation design.
+
+
+WorldUpdate remains intentionally deferred.
+
+Retail behavior:
+
+  if current state == 1 and FE state != start screen:
+      WorldManager::UpdateWorld(0.f)
+  else:
+      WorldManager::UpdateWorld(dt)
+
+State mask:
+  0x20013
+
+Contains:
+  0x20000
+  0x10
+  0x2
+  0x1
+
+Does NOT contain:
+  0x4
+
+Critical lifecycle conclusion remains:
+
+  DO NOT add null guards merely to hide missing world lifecycle ownership.
+  DO NOT integrate WorldUpdate into production prematurely.
+
+============================================================
+Task-manager / state restoration
+============================================================
+
+  [DONE] nlTaskManager::Startup(0x10000)
+  [DONE] RunAllTasks() runtime test
+  [DONE] dispatch by priority / active-state mask validated
+  [DONE] StateTransition(from, to) callback behavior validated
+  [DONE] m_PrevState / m_CurrState / m_PendingState commit behavior validated
+  [DONE] transition 0x10000 → 4 validated in focused test
+  [DONE] task mask behavior after transition validated
+
+  [DONE] PC startup now stages the same retail initial state decision:
+
+         nlTaskManager::SetNextState(
+             GetConfigBool(Config::Global(), "skipfe", false) ? 2 : 4
+         )
+
+  [DONE] runtime smoke after restoring initial task state
+         stable blue framebuffer
+         clean Alt+F4
+         exit=0
+
+
+Important:
+
+  SetNextState() only stages m_PendingState.
+
+  The actual transition occurs on the next RunAllTasks(), matching the
+  retail startup model.
+
+
+============================================================
+MusyX / audio x64 bring-up
+============================================================
+
+  [DONE] MusyX source imported into the native PC build
+  [DONE] MusyX static library builds under MSVC x64
+  [DONE] PC audio runtime links into smstrikers_pc
+
+  [DONE] 02C40A — MSVC-safe pack scopes in seq.h / synth.h
+  [DONE] 02C40B — MSVC-safe inline_depth scope in stream.c
+  [DONE] 02C40C — GCC diagnostic pragmas guarded from MSVC
+
+  [DONE] C4103 packing/alignment warning frontier removed from these headers
+  [DONE] C4068 pragma warning frontier removed from MusyX targeted build
+
+  [DONE] GameCube / MWCC behavior preserved after all three fixes
+
+  [DONE] FE audio lookup is validated during PC startup
+  [DONE] FEStreamConfig is validated during PC startup
+  [DONE] platform audio startup bridge is validated during PC startup
+
+
+Last audited targeted MusyX warning frontier:
+
+  10x C4311 pointer truncation
+   1x C4028 formal parameter mismatch
+
+
+Important:
+
+  MusyX is very substantially imported and build-integrated on PC,
+  but "full imported" does not yet mean "fully functional native audio".
+
+  ARAM / DSP / address-width assumptions still contain Dolphin-era
+  32-bit semantics that must be adapted carefully for x64.
+
+
+============================================================
+Recent validation anchors
+============================================================
+
+Current validated anchors include:
+
+  [PASS] full Debug PC build at current HEAD
+  [PASS] smstrikers_pc.exe link
+  [PASS] smstrikers_pcfescene_runtime build
+
+  [PASS] smstrikers_pctask_test
+         PC nlTaskManager runtime: PASS
+
+  [PASS] smstrikers_pcinput_task_test
+         PC input task runtime: PASS
+
+  [PASS] smstrikers_glplat_prestartup_test.exe
+         glplatPreStartup : true
+         PASS
+
+  [PASS] ClockUpdateTask integration + focused validation
+  [PASS] LoadingManager integration + focused validation
+  [PASS] DispatchEventsTask integration + focused validation
+  [PASS] PlatPadUpdateTask integration + focused validation
+  [PASS] ComUpdateTask integration + focused validation
+
+  [PASS] focused WorldUpdateTask runtime validation
+  [PASS] focused ParticleUpdateTask runtime validation
+  [PASS] focused FrontEndTask runtime validation
+  [PASS] focused TweakerTask runtime validation
+  [PASS] focused AudioUpdateTask runtime validation
+  [PASS] focused EndFrameTask runtime validation
+
+  [PASS] UserOptions startup
+  [PASS] localization startup
+  [PASS] language startup
+  [PASS] memory-card icon startup
+
+  [PASS] ShapeRenderer startup
+  [PASS] DepthOfField startup
+  [PASS] FlareHandler startup
+  [PASS] glApp startup core
+  [PASS] BeginFrame skinning startup
+  [PASS] SetupViews focused runtime
+
+  [PASS] Health Warning native FE materialization
+  [PASS] Health Warning visible in production runtime
+
+  [PASS] Health -> Legal transition runtime
+  [PASS] Legal / Nintendo CrossFader visible
+  [PASS] Legal / NLG CrossFader visible
+
+  [PASS] Title FEN native materialization
+
+         smstrikers_pcfenative_test.exe:
+
+           PASS: FE health package native materialization
+                 (resources=2 animations=2)
+
+           PASS: FE title package native materialization
+                 (resources=6 nested-components=2 text=1)
+
+           exit=0
+
+  [PASS] full Debug PC build after Title materializer
+  [PASS] smstrikers_pc.exe linked at the current checkpoint
+
+Diagnostic note — runtime CWD:
+
+  PC file opens are still relative to the process working directory.
+
+  The expected retail asset working directory remains:
+
+    orig\G4QE01\files
+
+  Launching from the repo root can still fail on relative art/resource paths.
+
+  This remains expected behavior, not a regression.
+
+============================================================
+Recent commits — retail task / input restoration
+============================================================
+
+Task/input restoration commits retained as important anchors:
+
+  90dee016  Validate PC task dispatch runtime
+  6f509a02  Run PC input processing through task manager
+  c7656ff3  Validate PC input task processing
+  4890396e  Validate PC task state transition
+  9d560b71  Restore PC initial task state
+
+  14221738  Validate PC world update task runtime
+  915e9c71  Validate PC particle update task runtime
+  011d5f9d  Validate PC front-end task runtime
+  44a0141b  Validate PC tweaker task runtime
+  2aa086bf  Validate PC audio update task runtime
+  91df0729  Validate PC end-frame task runtime
+
+  7fc38ffc  Integrate PC dispatch events task runtime
+  623296b3  Integrate PC PlatPad update task runtime
+  cdae6f31  Integrate PC Com update task runtime
+
+============================================================
+Recent commits — startup / renderer bring-up
+============================================================
+
+Earlier startup / renderer bring-up:
+
+  ae416cb5  Add PC UserOptions startup core
+  dbfa090e  Integrate PC localization startup
+  1a80db80  Integrate PC language startup
+  db4f0a04  Seed PC NL random state at startup
+
+  bce0fd68  Add PC GL user data runtime
+  9461d8e9  Define PC model runtime ABI
+  a1bc8453  Add PC GL mesh writer runtime
+
+  6b99785f  Integrate PC ShapeRenderer startup
+  9cf0c3f6  Integrate PC depth of field startup
+  ce332aad  Integrate PC flare handler startup
+  dfac630f  Integrate PC glApp startup core
+  fc1e55e6  Integrate PC BeginFrame skinning startup
+
+  16e0731f  Integrate PC memory card icon startup
+  e1a3b17c  Integrate PC SetupViews startup
+
+  2e871c77  Add PC glxTarget startup boundary
+  d027d9a3  Integrate PC global texture startup
+  ed655062  Validate PC FE audio lookup during startup
+
+
+Transition / FE bring-up after the 18.09 document:
+
+  9eab20b   Add PC transition attach runtime
+  4a522228  Promote PC FrontEnd boot runtime
+  bf170ce0  Render PC health warning frontend
+  ffd5dda9  Validate PC FE full resource bootstrap
+  2fe43491  Advance PC frontend boot through title materialization
+
+
+Current code checkpoint:
+
+  2fe43491  Advance PC frontend boot through title materialization
+
+============================================================
+Deferred dependency / architecture frontiers
+============================================================
+
+[PARTIAL / STILL OPEN] full FE/world/game lifecycle
+
+What changed:
+
+  FE bootstrap is now real enough to render Health and Legal.
+
+What remains:
+
+  - TitleScene integration
+  - Main Menu support
+  - broader FE scene coverage
+  - gameplay/world state ownership
+  - loader lifecycle required for world state
+  - FixedUpdate / WorldUpdate production ownership
+
+
+[DEFERRED] THP / movie playback
+
+Reason:
+
+  IntroMovieScene depends on the GameCube THP/movie stack.
+
+  Current decision:
+    bypass Intro Movie only for the Title bootstrap milestone,
+    while keeping real movie playback as a separate future milestone.
+
+
+[DEFERRED] full retail FixedUpdateTask
+
+Reason:
+
+  It still reaches substantially deeper gameplay/world/physics/ball/replay
+  dependencies and is not a safe bring-up step yet.
+
+
+[DEFERRED] exact GameCube PAD callback API emulation
+
+Reason:
+
+  The native frame loop already has an explicit, validated polling bridge.
+
+  There is no reason to invent SISetSamplingRate /
+  PADSetSamplingCallback shims merely to imitate the API surface.
+
+
+[DEFERRED] Wiper startup
+
+Reason:
+
+  Wiper opens the major model/resource dependency closure:
+
+    GLT
+    FX
+    GLG
+    SAnim
+    SHier
+
+  This remains an important frontier for deeper 3D rendering.
+
+
+[AUDITED / DEFERRED] FE/audio event handlers beyond current bootstrap
+
+  FrontEnd::FEEventHandler
+  OverlayManager::FEEventHandler
+  FEAudioEventHandler
+  Audio::AudioEventHandler
+
+  Do not invent fake behavior merely to advance scene flow.
+
+
+[DEFERRED] full native audio behavior
+
+  MusyX is build-integrated, but ARAM / DSP / 32-bit address assumptions
+  still need careful x64 adaptation.
+
+============================================================
+PC executable
+============================================================
+
+  build-pc\Release\smstrikers_pc.exe
+
+
+Required retail runtime working directory:
+
+  orig\G4QE01\files
+
+
+============================================================
+Current visual state
+============================================================
+
+Current production visual truth:
+
+  [DONE] authentic retail Health Warning renders
+  [DONE] Health Warning can be advanced with current keyboard input
+  [DONE] Legal / Nintendo CrossFader becomes visible
+  [DONE] Legal / NLG CrossFader becomes visible
+
+Then:
+
+  SCENE_INTRO_MOVIE is requested
+      ↓
+  PC movie scene is unsupported
+      ↓
+  blue framebuffer
+
+So the blue framebuffer is no longer the entire visual state.
+
+It is now the expected endpoint AFTER the working Health -> Legal sequence.
+
+Title package materialization is already validated, but TitleScene is not yet
+wired into the production scene flow.
+
+No gameplay / match scene is rendered yet.
+
+============================================================
+Current startup reached — 30.09.2026
+============================================================
+
+Current startup / FE path:
+
+  Aurora / WebGPU / D3D12
+      ↓
+  GL / GLX startup
+      ↓
+  global.glt + 46/46 global texture registration
+      ↓
+  retail config files
+      ↓
+  UserOptions
+      ↓
+  localization / language
+      ↓
+  EventManager
+      ↓
+  nlTaskManager::Startup(0x10000)
+      ↓
+  tDebugPrintManager
+      ↓
+  ClockManager::Initialize()
+      ↓
+  PC audio / FE audio startup validation
+      ↓
+  glResourceMark()
+      ↓
+  glInventory.Create()
+      ↓
+  InitPads()
+      ↓
+  AIPadManager::Startup()
+      ↓
+  FEInput::Initialize()
+      ↓
+  FlickDetection::Initialize()
+      ↓
+  selective PC task registration
+      ↓
+  nlTaskManager::SetNextState(skipfe ? 2 : 4)
+      ↓
+  memory-card icon startup
+      ↓
+  GameInfoManager
+      ↓
+  StatsTracker
+      ↓
+  SetupViews()
+      ↓
+  ShapeRenderer::Initialize()
+      ↓
+  [Wiper deferred]
+      ↓
+  DepthOfFieldManager::Initialize()
+      ↓
+  FlareHandler::Initialize()
+      ↓
+  glAppStartup()
+      ↓
+  BeginFrame skinning startup configuration
+      ↓
+  first native frame
+      ↓
+  VBlankPadUpdate()
+      ↓
+  nlTaskManager::RunAllTasks()
+      ↓
+  PC Transition / FrontEnd boot runtime
+      ↓
+  FE resource / scene bootstrap
+      ↓
+  Health Warning
+      ↓
+  Health requests transition
+      ↓
+  DestroyFEFast() / InitializeFEState()
+      ↓
+  Legal / CrossFader
+      ↓
+  Nintendo legal visual
+      ↓
+  NLG legal visual
+      ↓
+  SCENE_INTRO_MOVIE
+      ↓
+  [movie playback unsupported]
+      ↓
+  current blue endpoint
+
+Separately validated and ready underneath this frontier:
+
+  start_screen_v2.fen
+    -> native Title package materializer PASS
+
+============================================================
+Immediate next checkpoint
+============================================================
+
+Immediate next milestone:
+
+  Minimal PC TitleScene + scene routing.
+
+Goal:
+
+  Legal / CrossFader
+      ↓
+  temporary Intro Movie bypass
+      ↓
+  TitleScene
+      ↓
+  art/fe/start_screen_v2.fen visible
+
+Already complete for this milestone:
+
+  [DONE] Title FEN wire audit
+  [DONE] Title FEN native materializer
+  [DONE] nested component topology
+  [DONE] FEText / FEFontResource x64 foundation
+  [DONE] focused Title materializer test
+  [DONE] full Debug build after materializer
+
+Still required:
+
+  1. minimal TARGET_PC implementation of TitleScene
+  2. support SCENE_TITLE in PC GameSceneManager::Push()
+  3. CrossFader path that skips unsupported Intro Movie on PC
+  4. keep Title demo/movie timeout disabled or safely gated during bootstrap
+  5. runtime validation that Title becomes visible
+  6. then audit Start / A input path toward Main Menu
+
+Important scope decision:
+
+  Do NOT implement THP playback as part of this Title milestone.
+
+  Movie playback is a separate dependency frontier.
+
+After Title:
+
+  likely next FE milestone:
+    Title -> Main Menu
+
+  with its own dependency audit before production integration.
+
+
+Parallel larger frontiers remain:
+
+  A. model/resource closure
+       GLT / GLG / FX / SAnim / SHier
+       Wiper
+       deeper 3D rendering
+
+  B. retail frame lifecycle ownership
+       BeginFrame
+       GameRender
+       ParticleUpdate
+       EndFrame
+
+  C. full world/game lifecycle
+       loaders
+       WorldManager ownership
+       FixedUpdate
+       WorldUpdate
+
+  D. full native audio runtime
+       real audio.cpp closure
+       MusyX x64 semantics
+
+============================================================
+GameCube reference remains intact
+============================================================
+
+Last known GameCube reference baseline remains:
+
+  731 / 731 files
+  8605 / 8605 functions
+
+  Code:
+    2662332 / 2662332 bytes
+
+  Data:
+    960203 / 961907 bytes — 99.82%
+
+  250 / 250 Fans
+   90 /  90 Megastrikes
+
+Important 30.09 note:
+
+  This is the last recorded reference baseline in this state document.
+
+  The current chat did NOT re-run the GameCube baseline after commit 2fe43491,
+  so do not describe these numbers as a fresh post-Title verification until
+  that baseline is run again.
+
+============================================================
+Repository checkpoint — 18.09.2026
+============================================================
+
+Branch:
+
+  pc-port
+
+
+Current closed code checkpoint:
+
+  2fe43491  Advance PC frontend boot through title materialization
+
+
+Immediately preceding FE checkpoints:
+
+  ffd5dda9  Validate PC FE full resource bootstrap
+  bf170ce0  Render PC health warning frontend
+  4a522228  Promote PC FrontEnd boot runtime
+  9eab20b   Add PC transition attach runtime
+
+
+Current focused validation:
+
+  PASS: FE health package native materialization
+        (resources=2 animations=2)
+
+  PASS: FE title package native materialization
+        (resources=6 nested-components=2 text=1)
+
+  exit=0
+
+
+Current full PC validation:
+
+  Debug build:
+    PASS
+
+  smstrikers_pc.exe link:
+    PASS
+
+  Current production FE smoke already validated before the Title-package commit:
+    Health Warning visible
+    Legal/Nintendo visible
+    Legal/NLG visible
+    then blue at unsupported Intro Movie
+
+
+Known intentionally untouched working-tree state after commit 2fe43491:
+
+   D "Super Mario Strikers PC Port ΓÇô Progress.md"
+  ?? "Super Mario Strikers PC Port - Progress.md"
+  ?? smstrikers-decomp-pc-port-61db53f7-2026-09-12.zip
+
+Additional current untracked local diagnostics / helpers include:
+
+  bp-tev-runtime.log
+  bp-tev-warn-runtime.log
+  gxinit-runtime.log
+  health-clean-runtime.log
+  health-real-draw.log
+  patch32bb7o-build.log
+  shader-debug-runtime.log
+  tev-setter-runtime.log
+  script/
+
+These are local noise / retained tooling and are NOT part of normal code commits.
+
+Do NOT stage the Progress-document rename/noise, backup zip, runtime logs,
+or script/ helper directory as part of normal PC-port milestone commits.
+
+============================================================
+High-level interpretation — 30.09.2026
+============================================================
+
+The project has crossed an important line since the 18.09 checkpoint.
+
+On 18.09:
+
+  - the platform/startup foundation was strong
+  - task ownership was mostly classified
+  - SetupViews and renderer startup were integrated
+  - the visible result was still only a stable blue framebuffer
+  - FE/world lifecycle was mainly a deferred architectural frontier
+
+On 30.09:
+
+  - Transition attach/runtime work is active
+  - the PC FrontEnd boot runtime is active
+  - FE package materialization is real
+  - FE resources/scenes are bootstrapped far enough to render retail content
+  - Health Warning renders
+  - Health -> Legal transition works
+  - Nintendo and NLG Legal/CrossFader visuals render
+  - Title FEN materialization is complete and focused-test validated
+  - FEText / FEFontResource x64 semantics have advanced enough for Title text
+  - full Debug PC build is green at HEAD 2fe43491
+
+This means Prima Lux, interpreted literally as the first authentic retail
+rendered frame, has been achieved on the FE path.
+
+That milestone should NOT be confused with gameplay rendering.
+
+The decisive remaining "real game" frontiers are now:
+
+  1. TitleScene + Main Menu scene progression
+  2. broader FE/menu runtime completeness
+  3. gameplay/world lifecycle ownership
+  4. model/resource closure for deeper 3D content
+  5. retail-vs-Aurora frame lifecycle reconciliation
+  6. full native audio behavior
+  7. THP/movie playback
+
+The immediate narrow frontier is intentionally smaller:
+
+  bypass unsupported Intro Movie on PC
+      ↓
+  wire minimal TitleScene
+      ↓
+  render start_screen_v2.fen
+      ↓
+  validate Title input / Main Menu handoff
+
+This is preferable to opening THP/movie playback prematurely.
+
+Current visual truth:
+
+  authentic Health Warning
+      ↓
+  authentic Legal/CrossFader
+      ↓
+  blue endpoint at unsupported Intro Movie
+
+Title assets are already materializable; Title scene runtime is the next step.
+
+Rough overall native-port completion:
+
+  ~35% toward a polished Triumphus-quality port
+
+Aquila Surgit:
+
+  ~98% complete
+
+Prima Lux:
+
+  ACHIEVED on the FE path
+
+Roma Victrix:
+
+  still distant; no playable match / gameplay scene yet
+
+
+Exact latest handoff point:
+
+  2fe43491  Advance PC frontend boot through title materialization
+
+Next work:
+
+  minimal PC TitleScene + SCENE_TITLE routing + temporary Intro Movie bypass.
+
